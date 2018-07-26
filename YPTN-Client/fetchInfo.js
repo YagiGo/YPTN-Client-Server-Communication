@@ -10,6 +10,11 @@ function callback(requestDetails) {
 // browser.webRequest.onBeforeRequest.addListener(
 chrome.webRequest.onBeforeRequest.addListener(
 	callback,
-	{urls: ["<all_urls>"]},
+	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
+);
+chrome.webRequest.onBeforeSendHeaders.addListener(
+    callback,
+    {urls: ["<all_urls>"]},
+    ["blocking"]
 );
