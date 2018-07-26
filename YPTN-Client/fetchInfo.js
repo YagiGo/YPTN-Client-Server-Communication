@@ -2,7 +2,7 @@
  * Created by zhaoxin on 18/07/26.
  */
 function callback(requestDetails) {
-	console.log(requestDetails);
+	console.log("Console Log: ",requestDetails);
 }
 
 // add the listener,
@@ -13,8 +13,10 @@ chrome.webRequest.onBeforeRequest.addListener(
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
 );
+/*
 chrome.webRequest.onBeforeSendHeaders.addListener(
     callback,
-    {urls: ["<all_urls>"]},
+    {urls: ["<all_urls>"], types: ["main_frame"]},
     ["blocking"]
 );
+*/

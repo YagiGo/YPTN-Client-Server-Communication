@@ -1,0 +1,22 @@
+{
+  "manifest_version":2,
+  "name":"YPTN-Client",
+  "version":"1.0",
+  "description":"This is the client part of the YPTN, the edge-computing assisted web browsing system",
+
+  "background": {
+    "scripts":[
+      "fetchInfo.js",
+      "pageCapture.js"
+    ],
+    "persistent": true
+  },
+
+  "permissions":[
+    "*://*/*",
+    "webRequest",
+    "webRequestBlocking",
+    "pageCapture",
+    "tabs"
+  ]
+}
