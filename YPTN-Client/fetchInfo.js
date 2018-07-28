@@ -16,6 +16,8 @@ chrome.webRequest.onBeforeRequest.addListener(
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
 );
+
+
 /*
 chrome.webRequest.onBeforeSendHeaders.addListener(
     callback,
