@@ -7,7 +7,9 @@
   "background": {
     "scripts":[
       "fetchInfo.js",
-      "trace.js"
+      "trace.js",
+      "Third-Party/jQuery.js",
+      "Third-Party/socket.io.min.js"
     ],
     "persistent": true
   },

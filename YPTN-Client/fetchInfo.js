@@ -3,8 +3,7 @@
  */
 let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
-let ws = new WebSocket('ws://localhost:8080'); //Websocket Communication
-
+//let ws = new WebSocket('http://localhost:8080'); //Websocket Communication
 function callback(requestDetails) {
 	// For test purpose
 	console.log("Console Log: ",requestDetails);
@@ -41,7 +40,13 @@ function pageChange(requestDetails) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
 		console.log("New event: ", requestDetails);
-		ws.send(requestDetails.toString()); //
+		$.getScript("/Third-Party/socket.io.min.js", function() {
+		    console.log("Loading socket IO Successfully!")
+		    let ws = io.connect();
+		    ws.on('connect', function (requestDetails) {
+		        ws.emit("new_page_info",requestDetails.toJSON());
+		    });
+        });
 	}
 
 	else if(previousRequestID === requestDetails.requestId) {
