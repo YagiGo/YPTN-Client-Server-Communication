@@ -6,7 +6,8 @@
 
   "background": {
     "scripts":[
-      "fetchInfo.js"
+      "fetchInfo.js",
+      "trace.js"
     ],
     "persistent": true
   },
@@ -16,6 +17,8 @@
     "webRequest",
     "webRequestBlocking",
     "pageCapture",
-    "tabs"
+    "tabs",
+    "contentSettings",
+    "cookies"
   ]
 }

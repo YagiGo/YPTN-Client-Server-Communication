@@ -3,12 +3,14 @@
  */
 let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
+let ws = new WebSocket('ws://localhost:8080'); //Websocket Communication
 
 function callback(requestDetails) {
 	// For test purpose
 	console.log("Console Log: ",requestDetails);
 }
 
+/*
 function changeMainFrame(requestDetails) {
 	// The User have left the current site
 	console.log("The User have changed the domain: ", requestDetails);
@@ -26,6 +28,7 @@ function openNeWTab(requestDetails) {
 		console.log("The user has opened a new tab\n current tab count:", tabCounter);
 	}
 }
+*/
 
 function pageChange(requestDetails) {
 
@@ -38,6 +41,7 @@ function pageChange(requestDetails) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
 		console.log("New event: ", requestDetails);
+		ws.send(requestDetails.toString()); //
 	}
 
 	else if(previousRequestID === requestDetails.requestId) {
