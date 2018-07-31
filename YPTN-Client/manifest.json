@@ -6,8 +6,7 @@
 
   "background": {
     "scripts":[
-      "fetchInfo.js",
-      "pageCapture.js"
+      "fetchInfo.js"
     ],
     "persistent": true
   },
