@@ -3,7 +3,8 @@
  */
 let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
-//let ws = new WebSocket('http://localhost:8080'); //Websocket Communication
+ //Websocket Communication
+let ws = new WebSocket('ws://localhost:8080');
 function callback(requestDetails) {
 	// For test purpose
 	console.log("Console Log: ",requestDetails);
@@ -29,7 +30,16 @@ function openNeWTab(requestDetails) {
 }
 */
 
-function pageChange(requestDetails) {
+function sendDara(content, websocket) {
+	if(websocket.readyState === 1) {
+		websocket.send(content);
+	}
+	else if (websocket.readyState === 3) {
+		console.log("WebSocket Error!");
+	}
+}
+
+function pageChange(requestDetails, websocket=ws) {
 
 	if(requestDetails.url === "https://www.google.co.jp/_/chrome/newtab?ie=UTF-8") {
 		tabCounter += 1;
@@ -40,18 +50,16 @@ function pageChange(requestDetails) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
 		console.log("New event: ", requestDetails);
-		$.getScript("/Third-Party/socket.io.min.js", function() {
-		    console.log("Loading socket IO Successfully!")
-		    let ws = io.connect();
-		    ws.on('connect', function (requestDetails) {
-		        ws.emit("new_page_info",requestDetails.toJSON());
-		    });
-        });
+		if(websocket.readyState===1) {
+            websocket.send(requestDetails.url);
+        }
 	}
+
 
 	else if(previousRequestID === requestDetails.requestId) {
 		// One event has multiple request
 		console.log("Same Event: ", requestDetails);
+		sendDara(requestDetails.url, websocket);
 	}
 
 	else {
@@ -80,13 +88,14 @@ chrome.webRequest.onBeforeRequest.addListener(
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
 );
-
+/*
 chrome.webRequest.onBeforeRequest.addListener(
 	callback,
 	{urls: ["<all_urls>"]},
 	["blocking"]
 
 );
+*/
 /*
 chrome.webRequest.onBeforeRequest.addListener(
 	openNeWTab,
