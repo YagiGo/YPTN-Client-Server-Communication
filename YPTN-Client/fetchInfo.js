@@ -30,7 +30,7 @@ function openNeWTab(requestDetails) {
 }
 */
 
-function sendDara(content, websocket) {
+function sendData(content, websocket) {
 	if(websocket.readyState === 1) {
 		websocket.send(content);
 	}
@@ -38,6 +38,24 @@ function sendDara(content, websocket) {
 		console.log("WebSocket Error!");
 	}
 }
+
+function jsonifyRequestDetails(requestDetails) {
+	 
+	let result =	{
+			"frameId": requestDetails.frameId,
+			"initiator": requestDetails.initiator,
+			"method": requestDetails.method,
+			"parentFramneId": requestDetails.parentFramneId,
+			"requestId": requestDetails.requestId,
+			"tabId": requestDetails.tabId,
+			"timeStamp": requestDetails.timeStamp,
+			"type": requestDetails.type,
+			"url": requestDetails.url
+		}
+	return result;
+}
+
+
 
 function pageChange(requestDetails, websocket=ws) {
 
@@ -49,30 +67,22 @@ function pageChange(requestDetails, websocket=ws) {
 	else if(previousRequestID !== requestDetails.requestId || previousRequestID === '' ) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
-		console.log("New event: ", requestDetails);
-		if(websocket.readyState===1) {
-            websocket.send(requestDetails.url);
-        }
+		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
+		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
 
 	else if(previousRequestID === requestDetails.requestId) {
 		// One event has multiple request
 		console.log("Same Event: ", requestDetails);
-		sendDara(requestDetails.url, websocket);
+		//jsonify -> stringnify -> jsonify, this is the only way for websocket.
+		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
 	else {
 		previousRequestID = requestDetails.requestId;
 		console.log("Other Situation: ", requestDetails);
 	}
-}
-
-function sendData(domain, port) {
-	let socket = io.connect('http://' + domain + ":" + port);
-	socket.on('connect', function (requuestDetails) {
-		socket.emit('my event', requuestDetails);
-    })
 }
 
 /*
