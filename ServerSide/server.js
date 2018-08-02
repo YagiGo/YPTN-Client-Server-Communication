@@ -10,8 +10,8 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject) {
         let dbase = db.db("YPTN-Client");
         dbase.createCollection("access-sites")
         .then(function(dbCollection) {
+            console.log("Collection Switched!");
             dbCollection.insertOne(dataObject, function(res, err) {
-                console.log("insertion went wrong");
             });
         }).catch(function(err) {
             console.log("Create Collection went wrong");
@@ -19,8 +19,9 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject) {
     }).catch(function(err) {
         console.log("Change DB went wrong");
     });
-
 }
+
+
 
 wss.on('connection', function (ws) {
     console.log("Client Connected");
