@@ -38,10 +38,13 @@ function sendData(content, websocket) {
 		console.log("WebSocket Error!");
 	}
 }
-
+// For jsonifying the data, native websocket doesn't support emit method,
+// And I am really lazy and don't wanna rewrite the code for using socket.io ;)
+// Maybe in the future I will, but for now, use the identity to identify the data
 function jsonifyRequestDetails(requestDetails) {
 	 
 	let result =	{
+			"identity": "requestDetails",
 			"frameId": requestDetails.frameId,
 			"initiator": requestDetails.initiator,
 			"method": requestDetails.method,
@@ -56,7 +59,7 @@ function jsonifyRequestDetails(requestDetails) {
 }
 
 function jsonifyRequestHeader(requestHeader) {
-	let result = {};
+	let result = {"identity": "requestHeaders"};
 	requestHeader.forEach(function(element) {
 		result[element.name] = element.value;
 	})
@@ -128,6 +131,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 			}
 		});
 		console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
+		sendData(JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
 	},
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking", "requestHeaders"]
