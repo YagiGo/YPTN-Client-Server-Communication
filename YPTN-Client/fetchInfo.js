@@ -99,7 +99,7 @@ function pageChange(requestDetails, websocket=ws) {
 	else if(previousRequestID === requestDetails.requestId) {
 		// One event has multiple request
 		console.log("Same Event: ", requestDetails);
-		//jsonify -> stringnify -> jsonify, this is the only way for websocket.
+		//jsonify -> stringnify -> jsonify, the proper way for websocket.
 		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
