@@ -117,11 +117,6 @@ function distinguishHeaderByID(requestDetails) {
 // add the listener,
 // passing the filter argument and "blocking"
 // browser.webRequest.onBeforeRequest.addListener(
-chrome.webRequest.onBeforeRequest.addListener(
-	pageChange,
-	{urls: ["<all_urls>"], types: ["main_frame"]},
-	["blocking"]
-);
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
 	function(details) {
@@ -135,6 +130,18 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 	},
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking", "requestHeaders"]
+);
+
+chrome.webRequest.onBeforeRequest.addListener(
+	pageChange,
+	{urls: ["<all_urls>"], types: ["main_frame"]},
+	["blocking"]
+);
+
+chrome.webRequest.onBeforeRequest.addListener(
+	pageChange,
+	{urls: ["<all_urls>"], types: ["main_frame"]},
+	["blocking"]
 );
 /*
 chrome.webRequest.onBeforeRequest.addListener(

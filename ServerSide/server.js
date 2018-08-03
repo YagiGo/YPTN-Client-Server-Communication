@@ -1,6 +1,6 @@
 let WebSocketServer = require('ws').Server;
 wss = new WebSocketServer({port:8080});
-
+let requestCache;
 let MongoClient = require("mongodb").MongoClient;
 let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
 //I am supposed to use emit here, but to use emit in the
@@ -22,12 +22,16 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                 dbCollection.findOne(dataObject, (err, res) => {
                     if(err) {console.log(err);}
                     else if(res) {
-                        console("Find duplicates: ", res);
+                        console.log("Find duplicates: ", res);
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});
                     }
-                });
+                }); 
+            }
+            else if(collectionName === "testUserAgent") {
+                    //write the request into the db based on the user agnet
+                    dbCollection.insertOne(dataObject, (err, res) => {});
             }
         }).catch(function(err) {
             console.log(err);
@@ -80,13 +84,16 @@ wss.on('connection', function (ws) {
         if(msg.identity === "requestDetails") {
             // console.log(msg);
             // console.log(requestDetails.url);
-            writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
+            //writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
             //console.log(msg);
+            requestCache = msg;
         }
         else if(msg.identity === "requestHeaders") {
             console.log(msg["User-Agent"]);
             writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
             //findAccessRanking(MongoClient, dbUrl, collectionName="access-sites");
+            console.log("requestCache is ", requestCache);
+            writeDataintoDB(MongoClient, dbUrl, requestCache, collectionName = "testUserAgent");
             
         }
     });
