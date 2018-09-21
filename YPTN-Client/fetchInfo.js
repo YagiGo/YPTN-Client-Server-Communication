@@ -20,6 +20,10 @@ function changeSubFrame(requestDetails) {
 	// The user is still under the same page but in a different page
 	console.log("The user went to a different page under the same domain: ", requestDetails);
 }
+*/
+
+
+
 
 function openNeWTab(requestDetails) {
 	// Do something when user open a new tab
@@ -28,7 +32,6 @@ function openNeWTab(requestDetails) {
 		console.log("The user has opened a new tab\n current tab count:", tabCounter);
 	}
 }
-*/
 
 function sendData(content, websocket) {
 	if(websocket.readyState === 1) {
@@ -66,6 +69,7 @@ function jsonifyRequestHeader(requestHeader) {
 	return result;
 }
 
+// A uuid function
 function uuid() {
     let s = [];
     let hexDigits = "0123456789abcdef";
@@ -145,19 +149,18 @@ chrome.webRequest.onBeforeRequest.addListener(
 );
 /*
 chrome.webRequest.onBeforeRequest.addListener(
-	callback,
+callback,
 	{urls: ["<all_urls>"]},
 	["blocking"]
 
 );
 */
-/*
+
 chrome.webRequest.onBeforeRequest.addListener(
 	openNeWTab,
 	{urls: ["<all_urls>"], types: ['main_frame']},
 	['blocking']
 );
-*/
 
 /*
 chrome.webRequest.onBeforeSendHeaders.addListener(
