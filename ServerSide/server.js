@@ -69,9 +69,9 @@ function updateRanking(dbase,accessArray,collectionName, threshold) {
         dbCollection.removeMany();
         accessArray.forEach(element => {
             if(element["count"] >= threshold) {
-                console.log(element["_id"]["url"].length);
+                // console.log(element["_id"]["url"].length);
                 // console.log(element["count"]);  
-                console.log(element["_id"]["url"].hashCode());         
+                // console.log(element["_id"]["url"].hashCode());         
                 dbase.createCollection(collectionName)
                 .then(function(dbCollection) {
                     dbCollection.insertOne({
@@ -86,7 +86,7 @@ function updateRanking(dbase,accessArray,collectionName, threshold) {
 }
 
 function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
-    console.log("Start Finding Duplicates...");
+    // console.log("Start Finding Duplicates...");
     MongoClient.connect(dbUrl)
     .then(function(db) {
         let dbase = db.db("YPTN-Client");
@@ -111,23 +111,47 @@ function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
         console.log("Change DB went wrong");
     });
 }
+function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg) {
+    MongoClient.connect(dbUrl)
+    .then(function(db) {
+        let dbase = db.db("YPTN-Client");
+        dbase.createCollection(collectionName)
+        .then(function(dbCollection) {
+            dbCollection.findOne({"url":msg["url"]}, (err, res) => {
+                if(err) {console.log(err);}
+                else {
+                    if(!res) {
+                        console.log("Not frequently accessed");
+                        return false;
+                    }
+                    else {
+                        console.log("Find frequently accesses site: ", res);
+                        return true;
+                    }
+                }
+            });
+
+        });
+    });
+}
 
 wss.on('connection', function (ws) {
     console.log("Client Connected");
     ws.on('message', function(msg) {
         msg = JSON.parse(msg);
         if(msg.identity === "requestDetails") {
-            // console.log(msg);
+            console.log(msg);
             // console.log(requestDetails.url);
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
+            isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg);
             //console.log(msg);
             requestCache = msg;
         }
         else if(msg.identity === "requestHeaders") {
-            console.log(msg["User-Agent"]);
+            // console.log(msg["User-Agent"]);
             writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
             findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
-            console.log("requestCache is ", requestCache);
+            // console.log("requestCache is ", requestCache);
             writeDataintoDB(MongoClient, dbUrl, requestCache, collectionName = "testUserAgent");
             
         }
