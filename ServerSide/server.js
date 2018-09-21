@@ -111,7 +111,7 @@ function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
         console.log("Change DB went wrong");
     });
 }
-function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg) {
+function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, websocket) {
     MongoClient.connect(dbUrl)
     .then(function(db) {
         let dbase = db.db("YPTN-Client");
@@ -122,11 +122,11 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg) {
                 else {
                     if(!res) {
                         console.log("Not frequently accessed");
-                        return false;
+                        websocket.send("false");
                     }
                     else {
                         console.log("Find frequently accesses site: ", res);
-                        return true;
+                        websocket.send("true");
                     }
                 }
             });
@@ -143,7 +143,7 @@ wss.on('connection', function (ws) {
             console.log(msg);
             // console.log(requestDetails.url);
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
-            isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg);
+            isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
             //console.log(msg);
             requestCache = msg;
         }

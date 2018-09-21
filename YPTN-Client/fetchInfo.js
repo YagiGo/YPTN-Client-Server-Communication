@@ -41,6 +41,13 @@ function sendData(content, websocket) {
 		console.log("WebSocket Error!");
 	}
 }
+
+function isFrequentlyAccessedSites(websocket) {
+    // Receive flag from edge server indicating it is a frequently accessed site
+    websocket.addEventListener("message", function(event) {
+        console.log("data from server: ", event.data);
+    });
+}
 // For jsonifying the data, native websocket doesn't support emit method,
 // And I am really lazy and don't wanna rewrite the code for using socket.io ;)
 // Maybe in the future I will, but for now, use the identity to identify the data
@@ -96,6 +103,7 @@ function pageChange(requestDetails, websocket=ws) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
 		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
+		isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
 		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
@@ -124,7 +132,7 @@ function distinguishHeaderByID(requestDetails) {
 
 // TEST HERE
 // Save the webpage as MHTML in the cache for the most accessed sites
-function saveAndLoadMHTML(MongoClient, )
+function saveAndLoadMHTML()
 	/*
 	Process:
 	check the most-accessed collection, when the url the user is accessing matches, save the site as MHTML if it has not already been done, if it has, load the MHTML file from the DB
