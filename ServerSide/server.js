@@ -1,11 +1,23 @@
+// A NodeJS server
 let WebSocketServer = require('ws').Server;
 wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://192.168.96.16:27017"; //For test purpose only! Don't use this in the production environment!!!
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
+//Implement a hashCode function to generate digest
+String.prototype.hashCode = function() {
+	let hash = 0;
+	if(this.length == 0) return hash;
+	for (let i = 0; i < this.length; i++) {
+		let char = this.charCodeAt(i);
+		hash = ((hash<<5) - hash) + char;
+        hash = hash & hash;
+	}
+	return hash;
+}
 function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
     MongoClient.connect(dbUrl)
     .then(function(db) {
@@ -37,7 +49,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
             console.log(err);
         });
     }).catch(function(err) {
-        console.log("Change DB went wrong");
+        console.log("Change DB went wrong: ", err);
     });
 }
 /*
@@ -50,7 +62,30 @@ function removeDuplicateHeaders(dbCollection, keyWord) {
     }}));
 }
 */
-function findAccessRanking(MongoClient, dbUrl, collectionName) {
+
+function updateRanking(dbase,accessArray,collectionName, threshold) {
+    dbase.createCollection(collectionName)
+    .then(function(dbCollection){
+        dbCollection.removeMany();
+        accessArray.forEach(element => {
+            if(element["count"] >= threshold) {
+                console.log(element["_id"]["url"].length);
+                // console.log(element["count"]);  
+                console.log(element["_id"]["url"].hashCode());         
+                dbase.createCollection(collectionName)
+                .then(function(dbCollection) {
+                    dbCollection.insertOne({
+                       "url":element["_id"]["url"],
+                       "access-count":element["count"],
+                       "digest":element["_id"]["url"].hashCode()
+                    });
+                });
+            }
+        });
+    });
+}
+
+function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
     console.log("Start Finding Duplicates...");
     MongoClient.connect(dbUrl)
     .then(function(db) {
@@ -65,9 +100,9 @@ function findAccessRanking(MongoClient, dbUrl, collectionName) {
                     count: {$sum: 1}},
                 }
             ]).toArray((err, res) => {
-                console.log(res);
-                //DO something with the res
-
+                // console.log(res);
+                // DO something with the res
+                updateRanking(dbase, res, "access-ranking", 5);
             });
         }).catch(function(err) {
             console.log(err);
@@ -84,14 +119,14 @@ wss.on('connection', function (ws) {
         if(msg.identity === "requestDetails") {
             // console.log(msg);
             // console.log(requestDetails.url);
-            //writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
+            writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
             //console.log(msg);
             requestCache = msg;
         }
         else if(msg.identity === "requestHeaders") {
             console.log(msg["User-Agent"]);
             writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
-            //findAccessRanking(MongoClient, dbUrl, collectionName="access-sites");
+            findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
             console.log("requestCache is ", requestCache);
             writeDataintoDB(MongoClient, dbUrl, requestCache, collectionName = "testUserAgent");
             
