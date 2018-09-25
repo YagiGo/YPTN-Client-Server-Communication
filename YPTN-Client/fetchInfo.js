@@ -43,11 +43,41 @@ function sendData(content, websocket) {
 }
 
 function isFrequentlyAccessedSites(websocket) {
-    // Receive flag from edge server indicating it is a frequently accessed site
-    websocket.addEventListener("message", function(event) {
-        console.log("data from server: ", event.data);
+    return new Promise((resolve) => {
+        websocket.addEventListener("message", function(event) {
+            console.log("data from server: ", event.data);
+            resolve(event.data);
+        });
+    }).catch((error) => {
+        console.log(error);
     });
+    // Receive flag from edge server indicating it is a frequently accessed site\
 }
+
+function requestCacheFromEdge(websocket) {
+    // If this is one of the site in frequently accessed site,
+    // request site cache from the edge server
+
+}
+
+function sendNewCacheToEdge(websocket, requestDetails) {
+    // If the cache does not exist or has expired
+    // send new cache to the edge server. MHTML format for now
+    return new Promise((resolve => {
+        isFrequentlyAccessedSites(websocket).then((flag) => {
+            if (flag === "true") {
+                // Hit!
+                chrome.pageCapture.saveAsMHTML(requestDetails,
+                    function (mhtmlData) {
+                        console.log("Get site in mhtml form");
+                    });
+            }
+        }).catch((error) => console.log(error));
+    }));
+}
+
+
+
 // For jsonifying the data, native websocket doesn't support emit method,
 // And I am really lazy and don't wanna rewrite the code for using socket.io ;)
 // Maybe in the future I will, but for now, use the identity to identify the data
@@ -103,8 +133,9 @@ function pageChange(requestDetails, websocket=ws) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
 		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
-		isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
-		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
+		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
+		sendNewCacheToEdge(websocket, requestDetails);
+        sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
 
