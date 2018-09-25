@@ -18,6 +18,7 @@ String.prototype.hashCode = function() {
 	}
 	return hash;
 }
+
 function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
     MongoClient.connect(dbUrl)
     .then(function(db) {
@@ -43,6 +44,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
             }
             else if(collectionName === "testUserAgent") {
                     //write the request into the db based on the user agnet
+                    // console.log(dataObject);
                     dbCollection.insertOne(dataObject, (err, res) => {});
             }
         }).catch(function(err) {
@@ -135,12 +137,39 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, webso
     });
 }
 
+function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
+    MongoClient.connect(dbUrl)
+        .then(function(db) {
+            let dbase = db.db("YPTN-Client");
+            console.log("DB Connected");
+            dbase.createCollection(collectionName)
+                .then(function (dbCollection) {
+                    dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
+                        console.log(result);
+                        if(result === null) {
+                            dbCollection.insertOne(cacheData, (err, res) => {
+                                console.log(err);
+                            });
+                        }
+                        else {
+                            console.log("Has been cached at ")
+                        }
+                    });
+                });
+        });
+}
+
+function loadCacheFromDB(MongoClient, dbUrl, collectionName) {
+
+}
+
 wss.on('connection', function (ws) {
     console.log("Client Connected");
     ws.on('message', function(msg) {
         msg = JSON.parse(msg);
+        console.log(msg.identity);
         if(msg.identity === "requestDetails") {
-            console.log(msg);
+            // console.log(msg);
             // console.log(requestDetails.url);
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
             isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
@@ -152,8 +181,13 @@ wss.on('connection', function (ws) {
             writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
             findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
             // console.log("requestCache is ", requestCache);
-            writeDataintoDB(MongoClient, dbUrl, requestCache, collectionName = "testUserAgent");
+            writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
             
+        }
+
+        else if(msg.identity === "mhtmlData") {
+            console.log("Start caching site");
+            saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg)
         }
     });
 });

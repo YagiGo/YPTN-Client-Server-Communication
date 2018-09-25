@@ -84,7 +84,7 @@ function sendNewCacheToEdge(websocket, requestDetails) {
                     function (mhtmlData) {
                         // console.log("Get site in mhtml form");
                         console.log(mhtmlData);
-                        sendData(JSON.stringify(bsonifyMHTMLCache(mhtmlData, requestDetails.url)), websocket);
+                        sendData(JSON.stringify(bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timestamp)), websocket);
                     });
             }
         }).catch((error) => console.log(error));
@@ -112,11 +112,13 @@ function jsonifyRequestDetails(requestDetails) {
 		}
 }
 
-function bsonifyMHTMLCache(mhtmlData, url) {
-    return  {
+function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
+    return {
         "identity" : "mhtmlData",
+        "url" : url,
         "digest" : url.hashCode(),
         "cache" : mhtmlData,
+        "timestamp" : timestamp
     };
 }
 
