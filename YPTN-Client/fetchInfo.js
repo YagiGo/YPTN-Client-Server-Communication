@@ -5,6 +5,18 @@ let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
  //Websocket Communication
 let ws = new WebSocket('ws://localhost:8080');
+
+String.prototype.hashCode = function() {
+    let hash = 0;
+    if(this.length == 0) return hash;
+    for (let i = 0; i < this.length; i++) {
+        let char = this.charCodeAt(i);
+        hash = ((hash<<5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash;
+}
+
 function callback(requestDetails) {
 	// For test purpose
 	console.log("Console Log: ",requestDetails);
@@ -67,9 +79,12 @@ function sendNewCacheToEdge(websocket, requestDetails) {
         isFrequentlyAccessedSites(websocket).then((flag) => {
             if (flag === "true") {
                 // Hit!
-                chrome.pageCapture.saveAsMHTML(requestDetails,
+                console.log(requestDetails.tabId);
+                chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
                     function (mhtmlData) {
-                        console.log("Get site in mhtml form");
+                        // console.log("Get site in mhtml form");
+                        console.log(mhtmlData);
+                        sendData(JSON.stringify(bsonifyMHTMLCache(mhtmlData, requestDetails.url)), websocket);
                     });
             }
         }).catch((error) => console.log(error));
@@ -83,7 +98,7 @@ function sendNewCacheToEdge(websocket, requestDetails) {
 // Maybe in the future I will, but for now, use the identity to identify the data
 function jsonifyRequestDetails(requestDetails) {
 	 
-	let result =	{
+	return	{
 			"identity": "requestDetails",
 			"frameId": requestDetails.frameId,
 			"initiator": requestDetails.initiator,
@@ -95,14 +110,21 @@ function jsonifyRequestDetails(requestDetails) {
 			"type": requestDetails.type,
 			"url": requestDetails.url
 		}
-	return result;
+}
+
+function bsonifyMHTMLCache(mhtmlData, url) {
+    return  {
+        "identity" : "mhtmlData",
+        "digest" : url.hashCode(),
+        "cache" : mhtmlData,
+    };
 }
 
 function jsonifyRequestHeader(requestHeader) {
 	let result = {"identity": "requestHeaders"};
 	requestHeader.forEach(function(element) {
 		result[element.name] = element.value;
-	})
+	});
 	return result;
 }
 
