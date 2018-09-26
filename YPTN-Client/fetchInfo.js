@@ -83,8 +83,15 @@ function sendNewCacheToEdge(websocket, requestDetails) {
                 chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
                     function (mhtmlData) {
                         // console.log("Get site in mhtml form");
-                        console.log(mhtmlData);
-                        sendData(JSON.stringify(bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timestamp)), websocket);
+                        // console.log(mhtmlData);
+                        // let temp = bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp);
+                        // console.log(temp);
+                        bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
+                            .then((bsonifiedData) => {
+                                console.log(bsonifiedData);
+                                sendData(JSON.stringify(bsonifiedData), websocket);
+                            })
+                        // sendData(mhtmlData, websocket);
                     });
             }
         }).catch((error) => console.log(error));
@@ -113,13 +120,29 @@ function jsonifyRequestDetails(requestDetails) {
 }
 
 function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
-    return {
-        "identity" : "mhtmlData",
-        "url" : url,
-        "digest" : url.hashCode(),
-        "cache" : mhtmlData,
-        "timestamp" : timestamp
-    };
+    // Conver the blob into string
+    reader = new FileReader();
+    /*
+    Calling the readAsText method won’t actually return the text.
+    Instead, it fires a an event called loadend after it finishes reading the content of the blob.
+    You have to handle this event in order to access the content of the blob as text.
+    That text is stored in e.srcElement.result, where e is the event object.
+     */
+    return new Promise(resolve => {
+        reader.readAsText(mhtmlData);
+        reader.addEventListener("loadend", (e) => {
+            let text = e.srcElement.result;
+            let result = {
+                "identity": "mhtmlData",
+                "url": url,
+                "digest": url.hashCode(),
+                "cache": text,
+                "timestamp": timestamp
+            };
+            resolve(result);
+            // console.log("blob text as string", text);
+        });
+    })
 }
 
 function jsonifyRequestHeader(requestHeader) {

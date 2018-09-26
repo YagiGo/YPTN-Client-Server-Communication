@@ -166,8 +166,17 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName) {
 wss.on('connection', function (ws) {
     console.log("Client Connected");
     ws.on('message', function(msg) {
-        msg = JSON.parse(msg);
+        try
+        {
+            msg = JSON.parse(msg);
+        }
+        catch (e) {
+            console.log("A non-json file has been received");
+        }
+
+        console.log(msg);
         console.log(msg.identity);
+
         if(msg.identity === "requestDetails") {
             // console.log(msg);
             // console.log(requestDetails.url);
