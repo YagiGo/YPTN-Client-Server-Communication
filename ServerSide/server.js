@@ -196,7 +196,14 @@ wss.on('connection', function (ws) {
 
         else if(msg.identity === "mhtmlData") {
             console.log("Start caching site");
-            saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg)
+            let storedData = {
+                "cache" : new Blob(msg.cache),
+                "digest" : msg.digest,
+                "identity" : msg.identity,
+                "timeStamp" : msg.timeStamp,
+
+            };
+            saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
         }
     });
 });
