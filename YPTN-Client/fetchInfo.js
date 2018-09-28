@@ -137,7 +137,7 @@ function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
                 "url": url,
                 "digest": url.hashCode(),
                 "cache": text,
-                "timestamp": timestamp
+                "timeStamp": timestamp
             };
             resolve(result);
             // console.log("blob text as string", text);
