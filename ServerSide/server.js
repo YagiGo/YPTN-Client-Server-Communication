@@ -3,7 +3,7 @@ let WebSocketServer = require('ws').Server;
 wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.16:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -145,14 +145,14 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
             dbase.createCollection(collectionName)
                 .then(function (dbCollection) {
                     dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
-                        console.log(result);
+                        // console.log(result);
                         if(result === null) {
                             dbCollection.insertOne(cacheData, (err, res) => {
                                 console.log(err);
                             });
                         }
                         else {
-                            console.log("Has been cached at ")
+                            console.log("Has been cached")
                         }
                     });
                 });
@@ -174,8 +174,8 @@ wss.on('connection', function (ws) {
             console.log("A non-json file has been received");
         }
 
-        console.log(msg);
-        console.log(msg.identity);
+        // console.log(msg);
+        // console.log(msg.identity);
 
         if(msg.identity === "requestDetails") {
             // console.log(msg);
@@ -196,6 +196,7 @@ wss.on('connection', function (ws) {
 
         else if(msg.identity === "mhtmlData") {
             console.log("Start caching site");
+            /*
             let storedData = {
                 "cache" : new Blob(msg.cache),
                 "digest" : msg.digest,
@@ -203,6 +204,7 @@ wss.on('connection', function (ws) {
                 "timeStamp" : msg.timeStamp,
 
             };
+            */
             saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
         }
     });
