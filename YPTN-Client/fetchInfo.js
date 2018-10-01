@@ -221,23 +221,39 @@ function saveAndLoadMHTML()
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
 	function(details) {
-		details.requestHeaders.forEach(element => {
-			if(element.name === "User-Agent") {
-				console.log("User Agent: ", element.value);
-			}
-		});
-		console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
-		sendData(JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
+		 details.requestHeaders.forEach(element => {
+		 	if(element.name === "User-Agent") {
+		 		console.log("User Agent: ", element.value);
+		 	}
+		 });
+		 console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
+		 sendData(JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
 	},
-	{urls: ["<all_urls>"], types: ["main_frame"]},
+	{urls: ["<all_urls>"], types: ["main_frame", "sub_frame"]},
 	["blocking", "requestHeaders"]
-);
+)
 
-chrome.webRequest.onBeforeSendHeaders.addListener(
-	pageChange,
-	{urls: ["<all_urls>"], types: ["main_frame"]},
-	["blocking"]
-);
+let wr = chrome.declarativeWebRequest;
+chrome.declarativeWebRequest.onRequest.addRules([{
+    //First go to the DB to find match in the cache collection
+    //Then find the match with the current url
+    //If there is one, redirect the request to the mhtml file
+    //If there is none, just send the request as it is
+    //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
+    conditions: [new wr.RequestMatcher({url: {urlMatches: "."}})],
+    actions: [new wr.RedirectRequest({redirectUrl: "http://google.com"})]
+}]);
+
+// Comment out for test purpose, REMEMBER TO UNCOMMENT!
+// chrome.webRequest.onBeforeSendHeaders.addListener(
+// 	pageChange,
+// 	{urls: ["<all_urls>"], types: ["main_frame"]},
+// 	["blocking"]
+// );
+
+
+
+
 /*
 chrome.webRequest.onBeforeRequest.addListener(
 	pageChange,

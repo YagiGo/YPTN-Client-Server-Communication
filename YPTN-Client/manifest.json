@@ -15,6 +15,7 @@
   "permissions":[
     "*://*/*",
     "webRequest",
+    "declarativeWebRequest",
     "webRequestBlocking",
     "pageCapture",
     "tabs",
