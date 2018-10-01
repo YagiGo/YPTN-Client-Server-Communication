@@ -210,13 +210,12 @@ function distinguishHeaderByID(requestDetails) {
 
 // TEST HERE
 // Save the webpage as MHTML in the cache for the most accessed sites
-function saveAndLoadMHTML()
+function redirectToCache()
 	/*
 	Process:
 	check the most-accessed collection, when the url the user is accessing matches, save the site as MHTML if it has not already been done, if it has, load the MHTML file from the DB
 	*/
 {
-
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(

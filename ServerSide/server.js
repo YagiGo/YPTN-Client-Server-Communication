@@ -159,8 +159,20 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
         });
 }
 
-function loadCacheFromDB(MongoClient, dbUrl, collectionName) {
-
+function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails) {
+    MongoClient.connect(dbUrl)
+        .then(function (db) {
+            let dbase = db.db("YPTN-Client");
+            dbase.createCollection(collectionName)
+                .then(function(dbCollection) {
+                    dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
+                        if(result === null) { console.log("Cache not hit")}
+                        else {
+                            console.log("cache hit")
+                        }
+                    });
+                });
+        });
 }
 
 wss.on('connection', function (ws) {
@@ -182,6 +194,7 @@ wss.on('connection', function (ws) {
             // console.log(requestDetails.url);
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
             isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
+            loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg);
             //console.log(msg);
             requestCache = msg;
         }
