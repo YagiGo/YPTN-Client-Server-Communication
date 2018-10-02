@@ -1,6 +1,6 @@
 // A NodeJS server
 let WebSocketServer = require('ws').Server;
-wss = new WebSocketServer({port:8080});
+// wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
 let dbUrl = "mongodb://192.168.96.16:27017"; //For test purpose only! Don't use this in the production environment!!!
@@ -8,6 +8,12 @@ let dbUrl = "mongodb://192.168.96.16:27017"; //For test purpose only! Don't use 
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
 //Implement a hashCode function to generate digest
+
+//Rewrite the websocket part with socket.io
+let app = require("express")();
+let http = require("http").Server(app);
+let io = require("socket.io")(http);
+
 String.prototype.hashCode = function() {
 	let hash = 0;
 	if(this.length == 0) return hash;
@@ -124,11 +130,11 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, webso
                 else {
                     if(!res) {
                         console.log("Not frequently accessed");
-                        websocket.send("false");
+                        websocket.emit("AccessFrequencyCheck", "false");
                     }
                     else {
                         // console.log("Find frequently accesses site: ", res);
-                        websocket.send("true");
+                        websocket.emit("AccessFrequencyCheck", "true");
                     }
                 }
             });
@@ -169,59 +175,154 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                     dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
                         // console.log(result);
                         if(result === null) {
-                            websocket.send("uncached");
+                            websocket.emit("CacheExistenceCheck", "uncached");
                         }
                         else {
-                            websocket.send("cached");
+                            websocket.emit("CacheExistenceCheck", "cached");
                         }
                     });
                 });
         });
 }
+http.listen(8080, ()=> {
+    console.log("Start websocket server on port 8080");
+});
 
-wss.on('connection', function (ws) {
-    console.log("Client Connected");
-    ws.on('message', function(msg) {
-        try
-        {
+io.on("connection", (ws) => {
+    console.log("Client connected");
+    ws.on("RequestDetails", (msg) => {
+        try {
+            msg = JSON.parse(msg)
+        }
+        catch (e) {
+            console.log("A non-json file has been received")
+        }
+        writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "access-sites");
+        isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName = "access-ranking", msg, ws);
+        loadCacheFromDB(MongoClient, dbUrl, collectionName = "mhtml-cache", msg, ws);
+    });
+
+    ws.on("RequestHeader", (msg) => {
+        try {
             msg = JSON.parse(msg);
         }
         catch (e) {
-            console.log("A non-json file has been received");
+            console.log("A non-json file has been received")
         }
+        writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName = "user-history");
+        findAccessRanking(MongoClient, dbUrl, collectionName = "access-sites"), threshold = 5;
+        // console.log("requestCache is ", requestCache);
+        writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
+    });
+
+    ws.on("SiteCache", (msg) => {
+        try {
+            msg = JSON.parse(msg);
+        }
+        catch (e) {
+            console.log("A non-json file has been received")
+        }
+        console.log("Start caching site");
+        let storedData = {
+            "cache": msg.cache,
+            "digest": msg.digest,
+            "identity": msg.identity,
+            "timeStamp": msg.timeStamp,
+            "url": msg.url
+
+        };
+        saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "mhtml-cache", storedData);
+    });
+});
+
+    // ws.on('message', function(msg) {
+    //     try
+    //     {
+    //         msg = JSON.parse(msg);
+    //     }
+    //     catch (e) {
+    //         console.log("A non-json file has been received");
+    //     }
 
         // console.log(msg);
         // console.log(msg.identity);
 
-        if(msg.identity === "requestDetails") {
-            // console.log(msg);
-            // console.log(requestDetails.url);
-            writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
-            isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
-            loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg, ws);
+    //    if(msg.identity === "requestDetails") {
+    //        // console.log(msg);
+    //        // console.log(requestDetails.url);
+    //        writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
+    //        isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
+    //        loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg, ws);
             //console.log(msg);
-            requestCache = msg;
-        }
-        else if(msg.identity === "requestHeaders") {
+    //        requestCache = msg;
+    //    }
+    //    else if(msg.identity === "requestHeaders") {
             // console.log(msg["User-Agent"]);
-            writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
-            findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
+    //         writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
+    //         findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
             // console.log("requestCache is ", requestCache);
-            writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
-            
-        }
+    //        writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
 
-        else if(msg.identity === "mhtmlData") {
-            console.log("Start caching site");
-            let storedData = {
-                "cache" : msg.cache,
-                "digest" : msg.digest,
-                "identity" : msg.identity,
-                "timeStamp" : msg.timeStamp,
-                "url" : msg.url
+    //    }
 
-            };
-            saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
-        }
-    });
-});
+    //    else if(msg.identity === "mhtmlData") {
+    //        console.log("Start caching site");
+    //        let storedData = {
+    //            "cache" : msg.cache,
+    //            "digest" : msg.digest,
+    //            "identity" : msg.identity,
+    //            "timeStamp" : msg.timeStamp,
+    //            "url" : msg.url
+//
+    //        };
+    //        saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
+    //    }
+    // });
+// });
+
+// wss.on('connection', function (ws) {
+//     console.log("Client Connected");
+//     ws.on('message', function(msg) {
+//         try
+//         {
+//             msg = JSON.parse(msg);
+//         }
+//         catch (e) {
+//             console.log("A non-json file has been received");
+//         }
+//
+//         // console.log(msg);
+//         // console.log(msg.identity);
+//
+//         if(msg.identity === "requestDetails") {
+//             // console.log(msg);
+//             // console.log(requestDetails.url);
+//             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
+//             isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
+//             loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg, ws);
+//             //console.log(msg);
+//             requestCache = msg;
+//         }
+//         else if(msg.identity === "requestHeaders") {
+//             // console.log(msg["User-Agent"]);
+//             writeDataintoDB(MongoClient, dbUrl, {"User-Agent": msg["User-Agent"]}, collectionName="user-history");
+//             findAccessRanking(MongoClient, dbUrl, collectionName="access-sites"), threshold=5;
+//             // console.log("requestCache is ", requestCache);
+//             writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
+//
+//         }
+//
+//         else if(msg.identity === "mhtmlData") {
+//             console.log("Start caching site");
+//             let storedData = {
+//                 "cache" : msg.cache,
+//                 "digest" : msg.digest,
+//                 "identity" : msg.identity,
+//                 "timeStamp" : msg.timeStamp,
+//                 "url" : msg.url
+//
+//             };
+//             saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
+//         }
+//     });
+// });
