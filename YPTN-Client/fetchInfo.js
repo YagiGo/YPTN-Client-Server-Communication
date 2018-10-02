@@ -66,6 +66,24 @@ function isFrequentlyAccessedSites(websocket) {
     // Receive flag from edge server indicating it is a frequently accessed site\
 }
 
+function isSiteCached(websocket) {
+    return new Promise(resolve => {
+        websocket.addEventListener("message", function (event) {
+            console.log("data from server", event.data);
+            // while(event.data !== "cached" || event.data !== "uncached") {
+            //     console.log("NO CACHE INFO RECEIVED, WILL KEEP LOOPING");
+            //     websocket.onmessage = function(newEvent) {
+            //         console.log(newEvent.data);
+            //         event = newEvent;
+            //     }
+            //  }
+            resolve(event.data);
+        })
+    }).catch((error) => {
+        console.log(error);
+    });
+}
+
 function requestCacheFromEdge(websocket) {
     // If this is one of the site in frequently accessed site,
     // request site cache from the edge server
@@ -183,6 +201,14 @@ function pageChange(requestDetails, websocket=ws) {
 		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
 		sendNewCacheToEdge(websocket, requestDetails);
         sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
+        isSiteCached(websocket)
+            .then((flag) => {
+                console.log("Redirect to cache, ", flag);
+                if(flag === "cached") {
+                    console.log("Found cache, will redirect", requestDetails.url);
+                    redirectToCache(requestDetails.url);
+                }
+        });
 	}
 
 
@@ -199,6 +225,7 @@ function pageChange(requestDetails, websocket=ws) {
 	}
 }
 
+
 /*
 function distinguishHeaderByID(requestDetails) {
     for(let i = 0; i <requestDetails.length; i++)
@@ -210,12 +237,25 @@ function distinguishHeaderByID(requestDetails) {
 
 // TEST HERE
 // Save the webpage as MHTML in the cache for the most accessed sites
-function redirectToCache()
+
+
+function redirectToCache(url)
 	/*
 	Process:
 	check the most-accessed collection, when the url the user is accessing matches, save the site as MHTML if it has not already been done, if it has, load the MHTML file from the DB
 	*/
-{
+{   console.log("Redirect url ", url);
+    let wr = chrome.declarativeWebRequest;
+    chrome.declarativeWebRequest.onRequest.addRules([{
+    //First go to the DB to find match in the cache collection
+    //Then find the match with the current url
+    //If there is one, redirect the request to the mhtml file
+    //If there is none, just send the request as it is
+    //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
+
+     conditions: [new wr.RequestMatcher({url: {urlMatches: url}})],
+     actions: [new wr.RedirectRequest({redirectUrl: "https://google.com"})]
+    }]);
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
@@ -230,18 +270,9 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 	},
 	{urls: ["<all_urls>"], types: ["main_frame", "sub_frame"]},
 	["blocking", "requestHeaders"]
-)
+);
 
-let wr = chrome.declarativeWebRequest;
-chrome.declarativeWebRequest.onRequest.addRules([{
-    //First go to the DB to find match in the cache collection
-    //Then find the match with the current url
-    //If there is one, redirect the request to the mhtml file
-    //If there is none, just send the request as it is
-    //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
-    conditions: [new wr.RequestMatcher({url: {urlMatches: "."}})],
-    actions: [new wr.RedirectRequest({redirectUrl: "http://google.com"})]
-}]);
+
 
 // Comment out for test purpose, REMEMBER TO UNCOMMENT!
 // chrome.webRequest.onBeforeSendHeaders.addListener(
@@ -253,13 +284,13 @@ chrome.declarativeWebRequest.onRequest.addRules([{
 
 
 
-/*
+
 chrome.webRequest.onBeforeRequest.addListener(
 	pageChange,
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
 );
-*/
+
 /*
 chrome.webRequest.onBeforeRequest.addListener(
 callback,

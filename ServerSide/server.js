@@ -35,7 +35,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                 dbCollection.findOne(dataObject, (err, res) => {
                     if(err) {console.log(err);}
                     else if(res) {
-                        console.log("Find duplicates: ", res);
+                        // console.log("Find duplicates: ", res);
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});
@@ -127,7 +127,7 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, webso
                         websocket.send("false");
                     }
                     else {
-                        console.log("Find frequently accesses site: ", res);
+                        // console.log("Find frequently accesses site: ", res);
                         websocket.send("true");
                     }
                 }
@@ -145,7 +145,7 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
             dbase.createCollection(collectionName)
                 .then(function (dbCollection) {
                     dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
-                        console.log(result);
+                        // console.log(result);
                         if(result === null) {
                             dbCollection.insertOne(cacheData, (err, res) => {
                                 console.log(err);
@@ -159,16 +159,20 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
         });
 }
 
-function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails) {
+function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, websocket) {
     MongoClient.connect(dbUrl)
         .then(function (db) {
             let dbase = db.db("YPTN-Client");
             dbase.createCollection(collectionName)
                 .then(function(dbCollection) {
+                    // console.log(requestDetails.url);
                     dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
-                        if(result === null) { console.log("Cache not hit")}
+                        // console.log(result);
+                        if(result === null) {
+                            websocket.send("uncached");
+                        }
                         else {
-                            console.log("cache hit")
+                            websocket.send("cached");
                         }
                     });
                 });
@@ -186,15 +190,15 @@ wss.on('connection', function (ws) {
             console.log("A non-json file has been received");
         }
 
-        console.log(msg);
-        console.log(msg.identity);
+        // console.log(msg);
+        // console.log(msg.identity);
 
         if(msg.identity === "requestDetails") {
             // console.log(msg);
             // console.log(requestDetails.url);
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName="access-sites");
             isFrequentlyAccessedSite(MongoClient, dbUrl,collectionName="access-ranking",msg, ws);
-            loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg);
+            loadCacheFromDB(MongoClient, dbUrl, collectionName="mhtml-cache", msg, ws);
             //console.log(msg);
             requestCache = msg;
         }
@@ -209,13 +213,12 @@ wss.on('connection', function (ws) {
 
         else if(msg.identity === "mhtmlData") {
             console.log("Start caching site");
-            // Create a Blob Convertion
-            let buffer = Buffer.from()
             let storedData = {
-                "cache" : new Blob(msg.cache),
+                "cache" : msg.cache,
                 "digest" : msg.digest,
                 "identity" : msg.identity,
                 "timeStamp" : msg.timeStamp,
+                "url" : msg.url
 
             };
             saveNewCacheIntoDB(MongoClient, dbUrl, collectionName="mhtml-cache", storedData)
