@@ -4,8 +4,8 @@
 let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
  //Websocket Communication
-let ws = new WebSocket('ws://localhost:8080');
-
+// let ws = new WebSocket('ws://localhost:8080');
+let ws = io("http://localhost:8080");
 String.prototype.hashCode = function() {
     let hash = 0;
     if(this.length == 0) return hash;
@@ -45,9 +45,9 @@ function openNeWTab(requestDetails) {
 	}
 }
 
-function sendData(content, websocket) {
+function sendData(eventName, content, websocket) {
 	if(websocket.readyState === 1) {
-		websocket.send(content);
+		websocket.emit(eventName, content);
 	}
 	else if (websocket.readyState === 3) {
 		console.log("WebSocket Error!");
@@ -56,10 +56,13 @@ function sendData(content, websocket) {
 
 function isFrequentlyAccessedSites(websocket) {
     return new Promise((resolve) => {
-        websocket.addEventListener("message", function(event) {
-            console.log("data from server: ", event.data);
-            resolve(event.data);
+        websocket.on("AccessFrequencyCheck", (data) => {
+            console.log("data from server: ", data);
         });
+        // websocket.addEventListener("message", function(event) {
+        //     console.log("data from server: ", event.data);
+        //     resolve(event.data);
+        // });
     }).catch((error) => {
         console.log(error);
     });
@@ -68,8 +71,11 @@ function isFrequentlyAccessedSites(websocket) {
 
 function isSiteCached(websocket) {
     return new Promise(resolve => {
-        websocket.addEventListener("message", function (event) {
-            console.log("data from server", event.data);
+        websocket.on("CacheExistenceCheck", (event) => {
+            console.log("data from server ", event);
+        });
+        // websocket.addEventListener("message", function (event) {
+        //     console.log("data from server", event.data);
             // while(event.data !== "cached" || event.data !== "uncached") {
             //     console.log("NO CACHE INFO RECEIVED, WILL KEEP LOOPING");
             //     websocket.onmessage = function(newEvent) {
@@ -77,8 +83,9 @@ function isSiteCached(websocket) {
             //         event = newEvent;
             //     }
             //  }
+
             resolve(event.data);
-        })
+        // })
     }).catch((error) => {
         console.log(error);
     });
@@ -107,7 +114,7 @@ function sendNewCacheToEdge(websocket, requestDetails) {
                         bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
                             .then((bsonifiedData) => {
                                 console.log(bsonifiedData);
-                                sendData(JSON.stringify(bsonifiedData), websocket);
+                                sendData("SiteCache", JSON.stringify(bsonifiedData), websocket);
                             })
                         // sendData(mhtmlData, websocket);
                     });
@@ -121,6 +128,8 @@ function sendNewCacheToEdge(websocket, requestDetails) {
 // For jsonifying the data, native websocket doesn't support emit method,
 // And I am really lazy and don't wanna rewrite the code for using socket.io ;)
 // Maybe in the future I will, but for now, use the identity to identify the data
+// UPDATE: Websocket part has been rewritten with socket.io, now it supports emit method
+
 function jsonifyRequestDetails(requestDetails) {
 	 
 	return	{
@@ -200,7 +209,7 @@ function pageChange(requestDetails, websocket=ws) {
 		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
 		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
 		sendNewCacheToEdge(websocket, requestDetails);
-        sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
+        sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
         isSiteCached(websocket)
             .then((flag) => {
                 console.log("Redirect to cache, ", flag);
@@ -216,7 +225,7 @@ function pageChange(requestDetails, websocket=ws) {
 		// One event has multiple request
 		console.log("Same Event: ", requestDetails);
 		//jsonify -> stringnify -> jsonify, the proper way for websocket.
-		sendData(JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
+		sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
 	}
 
 	else {
@@ -266,7 +275,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 		 	}
 		 });
 		 console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
-		 sendData(JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
+		 sendData("RequestHeader", JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
 	},
 	{urls: ["<all_urls>"], types: ["main_frame", "sub_frame"]},
 	["blocking", "requestHeaders"]

@@ -6,6 +6,7 @@
 
   "background": {
     "scripts":[
+      "socket.io.js",
       "fetchInfo.js",
       "trace.js"
     ],
