@@ -41,7 +41,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                 dbCollection.findOne(dataObject, (err, res) => {
                     if(err) {console.log(err);}
                     else if(res) {
-                        // console.log("Find duplicates: ", res);
+                        console.log("Find duplicates: ", res);
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});

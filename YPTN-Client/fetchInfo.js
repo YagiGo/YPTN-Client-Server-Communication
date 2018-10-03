@@ -58,7 +58,8 @@ function sendData(eventName, content, websocket) {
 function isFrequentlyAccessedSites(websocket) {
     return new Promise((resolve) => {
         websocket.on("AccessFrequencyCheck", (data) => {
-            console.log("data from server: ", data);
+            // console.log("data from server: ", data);
+            resolve(data);
         });
         // websocket.addEventListener("message", function(event) {
         //     console.log("data from server: ", event.data);
@@ -73,7 +74,7 @@ function isFrequentlyAccessedSites(websocket) {
 function isSiteCached(websocket) {
     return new Promise(resolve => {
         websocket.on("CacheExistenceCheck", (event) => {
-            console.log("data from server ", event);
+            // console.log("data from server ", event);
             resolve(event);
         });
         // websocket.addEventListener("message", function (event) {
@@ -102,27 +103,36 @@ function requestCacheFromEdge(websocket) {
 function sendNewCacheToEdge(websocket, requestDetails) {
     // If the cache does not exist or has expired
     // send new cache to the edge server. MHTML format for now
-    return new Promise((resolve => {
-        isFrequentlyAccessedSites(websocket).then((flag) => {
-            if (flag === "true") {
-                // Hit!
-                console.log(requestDetails.tabId);
-                chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
-                    function (mhtmlData) {
-                        // console.log("Get site in mhtml form");
-                        // console.log(mhtmlData);
-                        // let temp = bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp);
-                        // console.log(temp);
-                        bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
-                            .then((bsonifiedData) => {
-                                console.log(bsonifiedData);
-                                sendData("SiteCache", JSON.stringify(bsonifiedData), websocket);
-                            })
-                        // sendData(mhtmlData, websocket);
-                    });
-            }
-        }).catch((error) => console.log(error));
-    }));
+    return new Promise(() => {
+        if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
+        {
+            isFrequentlyAccessedSites(websocket).then((flag) => {
+                if (flag === "true") {
+                    // Hit! and it is not chrome auto complete request
+                    console.log(requestDetails.tabId);
+                    console.log("Request Details: ", requestDetails);
+                    try
+                    {
+                        chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
+                            function (mhtmlData) {
+                                // console.log("Get site in mhtml form");
+                                // console.log(mhtmlData);
+                                // let temp = bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp);
+                                // console.log(temp);
+                                bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
+                                    .then((bsonifiedData) => {
+                                        console.log(bsonifiedData);
+                                        sendData("SiteCache", JSON.stringify(bsonifiedData), websocket);
+                                    })
+                            });
+                    }
+                    catch (e) {
+                        console.log("Cache site went wrong: ", e);
+                    }
+                }
+            }).catch((error) => console.log(error));
+        }
+    });
 }
 
 
@@ -204,7 +214,10 @@ function pageChange(requestDetails, websocket=ws) {
 		tabCounter += 1;
 		console.log("The user has opened a new tab\n current tab count:", tabCounter);
 	}
-
+	else if(requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
+    {
+        console.log("Chrome Auto Complete Triggered, will ignore");
+    }
 	else if(previousRequestID !== requestDetails.requestId || previousRequestID === '' ) {
 		// A new event was recorded
 		previousRequestID = requestDetails.requestId;
@@ -212,14 +225,18 @@ function pageChange(requestDetails, websocket=ws) {
 		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
 		sendNewCacheToEdge(websocket, requestDetails);
         sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
-        isSiteCached(websocket)
-            .then((flag) => {
-                console.log("Redirect to cache, ", flag);
-                if(flag === "cached") {
-                    console.log("Found cache, will redirect", requestDetails.url);
-                    redirectToCache(requestDetails.url);
-                }
-        });
+        if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
+        {
+            // Ignore the chrome auto complete request
+            isSiteCached(websocket)
+                .then((flag) => {
+                    console.log(requestDetails.url , flag);
+                    if(flag === "cached") {
+                        console.log("Found cache, will redirect", requestDetails.url);
+                        redirectToCache(requestDetails.url);
+                    }
+                });
+        }
 	}
 
 
@@ -265,19 +282,23 @@ function redirectToCache(url)
     //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
 
      conditions: [new wr.RequestMatcher({url: {urlMatches: url}})],
-     actions: [new wr.RedirectRequest({redirectUrl: "https://google.com"})]
+     actions: [new wr.RedirectRequest({redirectUrl: "http://google.com"})]
     }]);
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
 	function(details) {
-		 details.requestHeaders.forEach(element => {
-		 	if(element.name === "User-Agent") {
-		 		console.log("User Agent: ", element.value);
-		 	}
-		 });
-		 console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
-		 sendData("RequestHeader", JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
+	    if(!details.url.startsWith("https://www.google.co.jp/complete/search"))
+	    // Ignore chrome auto complete request
+        {
+            details.requestHeaders.forEach(element => {
+                if(element.name === "User-Agent") {
+                    console.log("User Agent: ", element.value);
+                }
+            });
+            console.log(jsonifyRequestHeader(details.requestHeaders)["User-Agent"]);
+            sendData("RequestHeader", JSON.stringify(jsonifyRequestHeader(details.requestHeaders)), websocket=ws);
+        }
 	},
 	{urls: ["<all_urls>"], types: ["main_frame", "sub_frame"]},
 	["blocking", "requestHeaders"]
