@@ -190,6 +190,10 @@ http.listen(8080, ()=> {
 
 io.on("connection", (ws) => {
     console.log("Client connected");
+    ws.on("disconnect", () => {
+        console.log("Client disconnected");
+    });
+
     ws.on("RequestDetails", (msg) => {
         try {
             msg = JSON.parse(msg)

@@ -46,12 +46,13 @@ function openNeWTab(requestDetails) {
 }
 
 function sendData(eventName, content, websocket) {
-	if(websocket.readyState === 1) {
-		websocket.emit(eventName, content);
-	}
-	else if (websocket.readyState === 3) {
-		console.log("WebSocket Error!");
-	}
+	websocket.emit(eventName, content);
+    // if(websocket.readyState === 1) {
+	// 	websocket.emit(eventName, content);
+	// }
+	// else if (websocket.readyState === 3) {
+	// 	console.log("WebSocket Error!");
+	// }
 }
 
 function isFrequentlyAccessedSites(websocket) {
@@ -73,6 +74,7 @@ function isSiteCached(websocket) {
     return new Promise(resolve => {
         websocket.on("CacheExistenceCheck", (event) => {
             console.log("data from server ", event);
+            resolve(event);
         });
         // websocket.addEventListener("message", function (event) {
         //     console.log("data from server", event.data);
@@ -84,7 +86,7 @@ function isSiteCached(websocket) {
             //     }
             //  }
 
-            resolve(event.data);
+
         // })
     }).catch((error) => {
         console.log(error);
