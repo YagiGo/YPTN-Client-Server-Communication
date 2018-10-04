@@ -93,9 +93,12 @@ function requestCacheFromEdge(websocket) {
     // If this is one of the site in frequently accessed site,
     // request site cache from the edge server
     console.log("Start sending cache back to client");
-    websocket.on("SendCache", (event)=> {
-       console.log("Cache sent from Edge Server: ", event);
-    });
+    return Promise(resolve => {
+        websocket.on("SendCache", (event)=> {
+            console.log("Cache sent from Edge Server: ", event);
+            resolve(event);
+            });
+        });
 }
 
 function sendNewCacheToEdge(websocket, requestDetails) {
@@ -226,21 +229,18 @@ function pageChange(requestDetails, websocket=ws) {
         if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
         {
             // Ignore the chrome auto complete request
-            //isSiteCached(websocket)
-            //    .then((flag) => {
-            //        console.log(requestDetails.url , flag);
-            //        if(flag === "cached") {
-            //            console.log("Found cache, will redirect", requestDetails.url);
-            //            requestCacheFromEdge(websocket);
-            //            redirectToCache(requestDetails.url);
-            //        }
-            //    });
-            requestCacheFromEdge(websocket, (event) => {
-                if(event === "uncached") {}
-                else{
-                    console.log("Cache sent from edge server received");
-                }
-            });
+            isSiteCached(websocket)
+                .then((flag) => {
+                    console.log(requestDetails.url , flag);
+                    if(flag === "cached") {
+                        console.log("Found cache, will redirect", requestDetails.url);
+                        requestCacheFromEdge(websocket)
+                            .then((event) => {
+                                console.log("Cache sent from edge server received: ", event);
+                            });
+                        redirectToCache(requestDetails.url);
+                    }
+                });
         }
 	}
 

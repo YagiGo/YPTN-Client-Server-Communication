@@ -178,7 +178,7 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                             websocket.emit("CacheExistenceCheck", "uncached");
                         }
                         else {
-                            // websocket.emit("CacheExistenceCheck", "cached");
+                            websocket.emit("CacheExistenceCheck", "cached");
                             websocket.emit("SendCache", result);
                         }
                     });
