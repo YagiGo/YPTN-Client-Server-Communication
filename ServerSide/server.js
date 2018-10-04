@@ -3,7 +3,7 @@ let WebSocketServer = require('ws').Server;
 // wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.16:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -178,7 +178,8 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                             websocket.emit("CacheExistenceCheck", "uncached");
                         }
                         else {
-                            websocket.emit("CacheExistenceCheck", "cached");
+                            // websocket.emit("CacheExistenceCheck", "cached");
+                            websocket.emit("SendCache", result);
                         }
                     });
                 });
