@@ -85,7 +85,7 @@ function isSiteCached(websocket) {
 
         // })
     }).catch((error) => {
-        console.log(error);
+        console.log(errxor);
     });
 }
 
@@ -235,12 +235,13 @@ function pageChange(requestDetails, websocket=ws) {
             //            redirectToCache(requestDetails.url);
             //        }
             //    });
-            requestCacheFromEdge(websocket, (event) => {
-                if(event === "uncached") {}
-                else{
-                    console.log("Cache sent from edge server received");
-                }
-            });
+            // requestCacheFromEdge(websocket, (event) => {
+            //     if(event === "uncached") {}
+            //     else{
+            //         console.log("Cache sent from edge server received");
+            //     }
+            // });
+            requestCacheFromEdge(websocket);
         }
 	}
 
@@ -312,21 +313,22 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
 
 // Comment out for test purpose, REMEMBER TO UNCOMMENT!
-// chrome.webRequest.onBeforeSendHeaders.addListener(
+chrome.webRequest.onBeforeSendHeaders.addListener(
+	pageChange,
+	{urls: ["<all_urls>"], types: ["main_frame"]},
+	["blocking"]
+);
+
+
+
+
+
+// chrome.webRequest.onHeadersReceived.addListener(
 // 	pageChange,
 // 	{urls: ["<all_urls>"], types: ["main_frame"]},
 // 	["blocking"]
 // );
 
-
-
-
-
-chrome.webRequest.onBeforeRequest.addListener(
-	pageChange,
-	{urls: ["<all_urls>"], types: ["main_frame"]},
-	["blocking"]
-);
 
 /*
 chrome.webRequest.onBeforeRequest.addListener(
