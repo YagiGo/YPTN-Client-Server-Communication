@@ -4,7 +4,6 @@ let WebSocketServer = require('ws').Server;
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
 let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
-
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -172,7 +171,7 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
             let dbase = db.db("YPTN-Client");
             dbase.createCollection(collectionName)
                 .then(function(dbCollection) {
-                    console.log("RECEIVED REQUEST FOR CAHCE:", requestDetails.url);
+                    // console.log(requestDetails.url);
                     dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
                         // console.log(result);
                         if(result === null) {
@@ -180,7 +179,6 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                         }
                         else {
                             // websocket.emit("CacheExistenceCheck", "cached");
-                            console.log("CACHE FOUND: ", "CACHE SAMPLE");
                             websocket.emit("SendCache", result);
                         }
                     });
