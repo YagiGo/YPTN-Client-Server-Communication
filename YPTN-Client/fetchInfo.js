@@ -85,7 +85,7 @@ function isSiteCached(websocket) {
 
         // })
     }).catch((error) => {
-        console.log(errxor);
+        console.log(error);
     });
 }
 
@@ -217,12 +217,6 @@ function pageChange(requestDetails, websocket=ws) {
         console.log("Chrome Auto Complete Triggered, will ignore");
     }
 	else if(previousRequestID !== requestDetails.requestId || previousRequestID === '' ) {
-		// A new event was recorded
-		previousRequestID = requestDetails.requestId;
-		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
-		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
-		sendNewCacheToEdge(websocket, requestDetails);
-        sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
         if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
         {
             // Ignore the chrome auto complete request
@@ -241,6 +235,12 @@ function pageChange(requestDetails, websocket=ws) {
             //         console.log("Cache sent from edge server received");
             //     }
             // });
+            // A new event was recorded
+            previousRequestID = requestDetails.requestId;
+            console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
+            // isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
+            sendNewCacheToEdge(websocket, requestDetails);
+            sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
             requestCacheFromEdge(websocket);
         }
 	}
@@ -292,6 +292,7 @@ function redirectToCache(url)
     }]);
 }
 
+/*
 chrome.webRequest.onBeforeSendHeaders.addListener(
 	function(details) {
 	    if(!details.url.startsWith("https://www.google.co.jp/complete/search"))
@@ -309,7 +310,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 	{urls: ["<all_urls>"], types: ["main_frame", "sub_frame"]},
 	["blocking", "requestHeaders"]
 );
-
+*/
 
 
 // Comment out for test purpose, REMEMBER TO UNCOMMENT!

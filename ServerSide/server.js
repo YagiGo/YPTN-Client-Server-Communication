@@ -3,7 +3,7 @@ let WebSocketServer = require('ws').Server;
 // wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -32,7 +32,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
         dbase.createCollection(collectionName)
         .then(function(dbCollection) {
             if(collectionName === "access-sites") {
-                console.log("Collection Switched!");
+                console.log("Collection Switched to", collectionName);
                 //console.log(removeDuplicateHeaders(dbCollection, "url"));
                 dbCollection.insertOne(dataObject, function(res, err) {
                 });
@@ -41,7 +41,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                 dbCollection.findOne(dataObject, (err, res) => {
                     if(err) {console.log(err);}
                     else if(res) {
-                        console.log("Find duplicates: ", res);
+                        // console.log("Find duplicates: ", res);
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});
@@ -100,7 +100,7 @@ function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
         let dbase = db.db("YPTN-Client");
         dbase.createCollection(collectionName)
         .then(function(dbCollection) {
-        console.log("Collection Switched!");
+        console.log("Collection Switched to", collectionName);
             dbCollection.aggregate([
                 {
                     $group: {
@@ -178,8 +178,9 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                             websocket.emit("CacheExistenceCheck", "uncached");
                         }
                         else {
+                            console.log("CACHE RECEIVED: ", "CACHE SAMPLE");
                             // websocket.emit("CacheExistenceCheck", "cached");
-                            websocket.emit("SendCache", result);
+                            websocket.emit("SendCache", "CACHE SAMPLE");
                         }
                     });
                 });
@@ -196,6 +197,7 @@ io.on("connection", (ws) => {
     });
 
     ws.on("RequestDetails", (msg) => {
+        console.log("RequestDetails RECEIVED: ", msg);
         try {
             msg = JSON.parse(msg)
         }
@@ -207,6 +209,7 @@ io.on("connection", (ws) => {
         loadCacheFromDB(MongoClient, dbUrl, collectionName = "mhtml-cache", msg, ws);
     });
 
+    /*
     ws.on("RequestHeader", (msg) => {
         try {
             msg = JSON.parse(msg);
@@ -219,6 +222,7 @@ io.on("connection", (ws) => {
         // console.log("requestCache is ", requestCache);
         writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "testUserAgent");
     });
+    */
 
     ws.on("SiteCache", (msg) => {
         try {
