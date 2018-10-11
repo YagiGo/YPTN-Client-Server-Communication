@@ -5,7 +5,7 @@ let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
  //Websocket Communication
 // let ws = new WebSocket('ws://localhost:8080');
-let ws = io("http://localhost:8080");
+let ws = io("http://192.169.96.208:8080");
 String.prototype.hashCode = function() {
     let hash = 0;
     if(this.length == 0) return hash;
