@@ -4,6 +4,9 @@ let WebSocketServer = require('ws').Server;
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
 let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
+const fs = require("fs");
+const crypto = require("crypto");
+
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -166,24 +169,62 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
 }
 
 function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, websocket) {
-    MongoClient.connect(dbUrl)
-        .then(function (db) {
-            let dbase = db.db("YPTN-Client");
-            dbase.createCollection(collectionName)
-                .then(function(dbCollection) {
-                    // console.log(requestDetails.url);
-                    dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
-                        // console.log(result);
-                        if(result === null) {
-                            websocket.emit("CacheExistenceCheck", "uncached");
-                        }
-                        else {
-                            // websocket.emit("CacheExistenceCheck", "cached");
-                            websocket.emit("SendCache", result);
-                        }
+    return new Promise(resolve => {
+        MongoClient.connect(dbUrl)
+            .then(function (db) {
+                let dbase = db.db("YPTN-Client");
+                dbase.createCollection(collectionName)
+                    .then(function(dbCollection) {
+                        // console.log(requestDetails.url);
+                        dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
+                            // console.log(result);
+                            if(result === null) {
+                                websocket.emit("CacheExistenceCheck", "uncached");
+                            }
+                            else {
+                                // websocket.emit("CacheExistenceCheck", "cached");
+                                websocket.emit("SendCache", result);
+                                resolve(result);
+                            }
+                        });
                     });
-                });
+            });
+    })
+}
+function hashToCreateUrl(url) {
+    let sha256sum = crypto.createHash('sha256'); // Use sha256 to hash the url to create a url for client to redirect
+
+    sha256sum.write(url);
+    sha256sum.end();
+    return new Promise(resolve => {
+        sha256sum.on("readable", () => {
+            const hashedResult = sha256sum.read();
+            console.log(hashedResult.toString('hex')); // hash result here
+            resolve(hashedResult.toString('hex'));
         });
+    });
+
+}
+
+function createMHTMLLFile(cacheData, path) {
+    return new Promise((resolve, reject) => {
+        fs,writeFile(path+'.mhtml', cacheData, (err) => {
+            if(err) reject(err);
+        })
+    });
+}
+
+function createCacheRequest(cacheDetails) {
+    // process the cache data in the db for client to redirect
+    // I haven't finished this part yet,
+    hashToCreateUrl(cacheDetails.url)
+        .then(fileName => {
+            createMHTMLLFile(cacheDetails.cache, fileName)
+                .then((error) => {
+                    if(error) throw(error);
+
+                })
+        })
 }
 http.listen(8080, ()=> {
     console.log("Start websocket server on port 8080");

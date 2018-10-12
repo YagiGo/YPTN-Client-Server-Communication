@@ -5,7 +5,7 @@ let tabCounter = 0; // Tab counter
 let previousRequestID = ''; //This is used to record previous request ID for same request
  //Websocket Communication
 // let ws = new WebSocket('ws://localhost:8080');
-let ws = io("http://192.169.96.208:8080");
+let ws = io("http://localhost:8080");
 String.prototype.hashCode = function() {
     let hash = 0;
     if(this.length == 0) return hash;
@@ -92,10 +92,13 @@ function isSiteCached(websocket) {
 function requestCacheFromEdge(websocket) {
     // If this is one of the site in frequently accessed site,
     // request site cache from the edge server
-    console.log("Start sending cache back to client");
-    websocket.on("SendCache", (event)=> {
-       console.log("Cache sent from Edge Server: ", event);
-    });
+    return new Promise((resolve => {
+        console.log("Start sending cache back to client");
+        websocket.on("SendCache", (event)=> {
+            console.trace("Cache sent from Edge Server: ", event);
+            resolve(event);
+        });
+    }));
 }
 
 function sendNewCacheToEdge(websocket, requestDetails) {
@@ -241,7 +244,10 @@ function pageChange(requestDetails, websocket=ws) {
             //         console.log("Cache sent from edge server received");
             //     }
             // });
-            requestCacheFromEdge(websocket);
+            requestCacheFromEdge(websocket)
+                .then(data => {
+                    redirectToCache(requestDetails.url);
+                });
         }
 	}
 
@@ -286,7 +292,6 @@ function redirectToCache(url)
     //If there is one, redirect the request to the mhtml file
     //If there is none, just send the request as it is
     //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
-
      conditions: [new wr.RequestMatcher({url: {urlMatches: url}})],
      actions: [new wr.RedirectRequest({redirectUrl: "http://google.com"})]
     }]);
