@@ -207,11 +207,14 @@ function hashToCreateUrl(url) {
 
 }
 
-function createMHTMLLFile(cacheData, path) {
+function createMHTMLLFile(cacheData, path, websocket) {
     return new Promise((resolve, reject) => {
         fs.writeFile(path+'.mhtml', cacheData, (err) => {
             if(err) reject(err);
-            // console.log("Cache file created!")
+            console.log("Cache file created!");
+            cacheFilePath = "http://192.168.96.153:8080/"+path+".mhtml";
+            console.log("Cache file path is: ", cacheFilePath);
+            sendCachePathToUser(cacheFilePath, websocket);
         })
     });
 }
@@ -225,11 +228,10 @@ function createCacheRequest(cacheDetails, websocket) {
     // I haven't finished this part yet,
     hashToCreateUrl(cacheDetails.url)
         .then(fileName => {
-            createMHTMLLFile(cacheDetails.cache, fileName)
+            createMHTMLLFile(cacheDetails.cache, fileName, websocket)
                 .then((error) => {
                     if(error) throw(error);
                     //Cache path = http://IP:port/filePath/fileName.mhtml
-                    sendCachePathToUser("http://192.168.96.153:8080/"+fileName+".mhtml", websocket);
                 })
         })
 }
