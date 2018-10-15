@@ -5,7 +5,8 @@ let requestCache;
 let MongoClient = require("mongodb").MongoClient;
 let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
 const fs = require("fs");
-const crypto = require("crypto");
+const crypto = require("crypto"); // hashing url
+const path = require("path"); // file path issue
 
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
@@ -183,8 +184,8 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                             }
                             else {
                                 // websocket.emit("CacheExistenceCheck", "cached");
-                                websocket.emit("SendCache", result);
-                                resolve(result);
+                                // websocket.emit("SendCache", result);
+                                createCacheRequest(result, websocket)
                             }
                         });
                     });
@@ -199,8 +200,8 @@ function hashToCreateUrl(url) {
     return new Promise(resolve => {
         sha256sum.on("readable", () => {
             const hashedResult = sha256sum.read();
-            console.log(hashedResult.toString('hex')); // hash result here
-            resolve(hashedResult.toString('hex'));
+            // console.log(hashedResult.toString('hex')); // hash result here
+            resolve(path.join(path.dirname("__dirname"), "/temp/", hashedResult.toString('hex')));
         });
     });
 
@@ -208,13 +209,18 @@ function hashToCreateUrl(url) {
 
 function createMHTMLLFile(cacheData, path) {
     return new Promise((resolve, reject) => {
-        fs,writeFile(path+'.mhtml', cacheData, (err) => {
+        fs.writeFile(path+'.mhtml', cacheData, (err) => {
             if(err) reject(err);
+            // console.log("Cache file created!")
         })
     });
 }
 
-function createCacheRequest(cacheDetails) {
+function sendCachePathToUser(cachePath, websocket)
+{
+    websocket.emit("CacheURL", cachePath);
+}
+function createCacheRequest(cacheDetails, websocket) {
     // process the cache data in the db for client to redirect
     // I haven't finished this part yet,
     hashToCreateUrl(cacheDetails.url)
@@ -222,12 +228,16 @@ function createCacheRequest(cacheDetails) {
             createMHTMLLFile(cacheDetails.cache, fileName)
                 .then((error) => {
                     if(error) throw(error);
-
+                    //Cache path = http://IP:port/filePath/fileName.mhtml
+                    sendCachePathToUser("http://192.168.96.153:8080/"+fileName+".mhtml", websocket);
                 })
         })
 }
-http.listen(8080, ()=> {
+
+
+http.listen(8080, (req)=> {
     console.log("Start websocket server on port 8080");
+    console.log(http.address());
 });
 
 io.on("connection", (ws) => {
