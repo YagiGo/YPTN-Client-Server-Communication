@@ -93,10 +93,10 @@ function requestCacheFromEdge(websocket) {
     // If this is one of the site in frequently accessed site,
     // request site cache from the edge server
     return new Promise((resolve => {
-        console.log("Start sending cache back to client");
-        websocket.on("SendCache", (event)=> {
-            console.trace("Cache sent from Edge Server: ", event);
-            resolve(event);
+        console.log("Start sending cache url to client");
+        websocket.on("CacheURL", (url)=> {
+            console.log("%c Cache url is: " + url, "background: #000000, color: #ffccdb");
+            resolve(url);
         });
     }));
 }
@@ -244,9 +244,10 @@ function pageChange(requestDetails, websocket=ws) {
             //         console.log("Cache sent from edge server received");
             //     }
             // });
+            console.log("%c Redirecting will start", 'background: #222; color: #bada55');
             requestCacheFromEdge(websocket)
-                .then(data => {
-                    redirectToCache(requestDetails.url);
+                .then(cacheURL => {
+                    redirectToCache(requestDetails.url, cacheURL);
                 });
         }
 	}
@@ -279,12 +280,12 @@ function distinguishHeaderByID(requestDetails) {
 // Save the webpage as MHTML in the cache for the most accessed sites
 
 
-function redirectToCache(url)
+function redirectToCache(url, cacheURL)
 	/*
 	Process:
 	check the most-accessed collection, when the url the user is accessing matches, save the site as MHTML if it has not already been done, if it has, load the MHTML file from the DB
 	*/
-{   console.log("Redirect url ", url);
+{   console.log("%c Redirect url " + url + " to " +cacheURL , "background: #000000, color: #485f60");
     let wr = chrome.declarativeWebRequest;
     chrome.declarativeWebRequest.onRequest.addRules([{
     //First go to the DB to find match in the cache collection
@@ -293,7 +294,7 @@ function redirectToCache(url)
     //If there is none, just send the request as it is
     //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
      conditions: [new wr.RequestMatcher({url: {urlMatches: url}})],
-     actions: [new wr.RedirectRequest({redirectUrl: "http://google.com"})]
+     actions: [new wr.RedirectRequest({redirectUrl: cacheURL})]
     }]);
 }
 
@@ -344,11 +345,11 @@ callback,
 );
 */
 
-chrome.webRequest.onBeforeRequest.addListener(
-	openNeWTab,
-	{urls: ["<all_urls>"], types: ['main_frame']},
-	['blocking']
-);
+// chrome.webRequest.onBeforeRequest.addListener(
+// 	openNeWTab,
+// 	{urls: ["<all_urls>"], types: ['main_frame']},
+// 	['blocking']
+// );
 
 /*
 chrome.webRequest.onBeforeSendHeaders.addListener(

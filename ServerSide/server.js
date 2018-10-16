@@ -7,6 +7,8 @@ let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use
 const fs = require("fs");
 const crypto = require("crypto"); // hashing url
 const path = require("path"); // file path issue
+const nStatic = require("node-static");
+let fileServer = new nStatic.Server('./temp');
 
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
@@ -14,7 +16,8 @@ const path = require("path"); // file path issue
 //Implement a hashCode function to generate digest
 
 //Rewrite the websocket part with socket.io
-let app = require("express")();
+let express = require("express");
+let app = express();
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
 
@@ -239,7 +242,14 @@ function createCacheRequest(cacheDetails, websocket) {
 
 http.listen(8080, (req)=> {
     console.log("Start websocket server on port 8080");
-    console.log(http.address());
+    console.log(req)
+});
+
+//app.use("/temp", express.static("temp"));
+
+app.get('/', (req, res) => {
+    console.log("Receiving request:", req.ip + req.hostname)
+    res.send("Cache works!");
 });
 
 io.on("connection", (ws) => {
