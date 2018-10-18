@@ -104,11 +104,13 @@ function requestCacheFromEdge(websocket) {
 function sendNewCacheToEdge(websocket, requestDetails) {
     // If the cache does not exist or has expired
     // send new cache to the edge server. MHTML format for now
+    websocket.binaryType = "Blob"; //What about sending blob data in a json?
     return new Promise(() => {
-        if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
+        if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search") && !requestDetails.url.startsWith("http://localhost"))
+        // Don't send local cache to cache to prevent loop
         {
             isFrequentlyAccessedSites(websocket).then((flag) => {
-                if (flag === "true") {
+                if (flag === "true" ) {
                     // Hit! and it is not chrome auto complete request
                     console.log(requestDetails.tabId);
                     console.log("Request Details: ", requestDetails);
@@ -180,7 +182,7 @@ function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
                 "timeStamp": timestamp
             };
             resolve(result);
-            // console.log("blob text as string", text);
+            // console.log(T"blob text as string", text);
         });
     })
 }
@@ -278,6 +280,13 @@ function distinguishHeaderByID(requestDetails) {
 
 // TEST HERE
 // Save the webpage as MHTML in the cache for the most accessed sites
+
+function receiveCacheUrlFromEdge()
+{
+    // get the cache file path from the edge server
+    // and then, redirect the request to the cache
+
+}
 
 
 function redirectToCache(url, cacheURL)

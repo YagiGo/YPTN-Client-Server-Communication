@@ -3,7 +3,7 @@ let WebSocketServer = require('ws').Server;
 // wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
 const fs = require("fs");
 const crypto = require("crypto"); // hashing url
 const path = require("path"); // file path issue
@@ -39,7 +39,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
         dbase.createCollection(collectionName)
         .then(function(dbCollection) {
             if(collectionName === "access-sites") {
-                console.log("Collection Switched!");
+                // console.log("Collection Switched!");
                 //console.log(removeDuplicateHeaders(dbCollection, "url"));
                 dbCollection.insertOne(dataObject, function(res, err) {
                 });
@@ -48,7 +48,7 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                 dbCollection.findOne(dataObject, (err, res) => {
                     if(err) {console.log(err);}
                     else if(res) {
-                        console.log("Find duplicates: ", res);
+                        // console.log("Find duplicates: ", res);
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});
@@ -107,7 +107,7 @@ function findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
         let dbase = db.db("YPTN-Client");
         dbase.createCollection(collectionName)
         .then(function(dbCollection) {
-        console.log("Collection Switched!");
+        // console.log("Collection Switched!");
             dbCollection.aggregate([
                 {
                     $group: {
@@ -215,7 +215,7 @@ function createMHTMLLFile(cacheData, path, websocket) {
         fs.writeFile(path+'.mhtml', cacheData, (err) => {
             if(err) reject(err);
             console.log("Cache file created!");
-            cacheFilePath = "http://192.168.96.153:8080/"+path+".mhtml";
+            cacheFilePath = "http://localhost:8080/"+path+".mhtml";
             console.log("Cache file path is: ", cacheFilePath);
             sendCachePathToUser(cacheFilePath, websocket);
         })
@@ -240,17 +240,26 @@ function createCacheRequest(cacheDetails, websocket) {
 }
 
 
+
 http.listen(8080, (req)=> {
     console.log("Start websocket server on port 8080");
     console.log(req)
 });
 
-//app.use("/temp", express.static("temp"));
 
-app.get('/', (req, res) => {
-    console.log("Receiving request:", req.ip + req.hostname)
-    res.send("Cache works!");
+/*
+app.use("/temp", express.static("temp"), (res,req) => {
 });
+
+
+app.get('/temp', (req, res) => {
+    // console.log("Receiving request:", req.ip + req.hostname)
+    // res.send("Cache works!");
+    res.sendFile("index.html");
+});
+*/
+
+
 
 io.on("connection", (ws) => {
     console.log("Client connected");
@@ -265,9 +274,13 @@ io.on("connection", (ws) => {
         catch (e) {
             console.log("A non-json file has been received")
         }
-        writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "access-sites");
-        isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName = "access-ranking", msg, ws);
-        loadCacheFromDB(MongoClient, dbUrl, collectionName = "mhtml-cache", msg, ws);
+        if(!msg.url.startsWith("http://localhost"))
+        // prevent local cache loop
+        {
+            writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "access-sites");
+            isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName = "access-ranking", msg, ws);
+            loadCacheFromDB(MongoClient, dbUrl, collectionName = "mhtml-cache", msg, ws);
+        }
     });
 
     ws.on("RequestHeader", (msg) => {
