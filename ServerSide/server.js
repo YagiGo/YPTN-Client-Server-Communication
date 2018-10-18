@@ -20,6 +20,7 @@ let express = require("express");
 let app = express();
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
+let mhtml2html = require("mhtml2html");
 
 String.prototype.hashCode = function() {
 	let hash = 0;
@@ -212,7 +213,11 @@ function hashToCreateUrl(url) {
 
 function createMHTMLLFile(cacheData, path, websocket) {
     return new Promise((resolve, reject) => {
-        fs.writeFile(path+'.mhtml', cacheData, (err) => {
+        // let html = new XMLSerializer().serializeToString(mhtml2html.convert(mhtml2html.parse(cacheData)).target);
+        let html = mhtml2html.convert(mhtml2html.parse(cacheData));
+        console.log("Converted html file:", html);
+        fs.writeFile(path+'.html',html, (err) => {
+
             if(err) reject(err);
             console.log("Cache file created!");
             cacheFilePath = "http://localhost:8080/"+path+".mhtml";
@@ -247,11 +252,11 @@ http.listen(8080, (req)=> {
 });
 
 
-/*
-app.use("/temp", express.static("temp"), (res,req) => {
+app.use("/temp", express.static("temp"));
+app.get("/", (req, res) => {
+
 });
-
-
+/*
 app.get('/temp', (req, res) => {
     // console.log("Receiving request:", req.ip + req.hostname)
     // res.send("Cache works!");
