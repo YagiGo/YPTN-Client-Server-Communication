@@ -1,4 +1,18 @@
 //Reconstruct the file
+class logging {
+    // Build a systematic logging system.
+}
+
+class connectInstance {
+    constructor(mongoClient, fileSystem, crypto, socketIO) {
+        this.mongoClient = mongoClient;
+        this.fileSystem = fileSystem;
+        this.crypto = crypto;
+        this.socketIO = socketIO;
+    }
+
+}
+
 class dbAccess {
     constructor(dbURL, port, dbName, client, collectionName) {
         this.dbURL = dbURL;
@@ -106,7 +120,6 @@ class dbAccess {
         })
     }
 
-
 }
 
 class webSocketAccess {
@@ -121,8 +134,100 @@ class HTMLConverter {
     }
 }
 
+class webPageEvaluate {
+    constructor(threshold) {
+        this.threshold = threshold;
+
+    }
+
+    updateRanking(dbase,accessArray,collectionName) {
+        dbase.createCollection(collectionName)
+            .then(function(dbCollection){
+                dbCollection.removeMany();
+                accessArray.forEach(element => {
+                    if(element["count"] >= this.threshold) {
+                        // console.log(element["_id"]["url"].length);
+                        // console.log(element["count"]);
+                        // console.log(element["_id"]["url"].hashCode());
+                        dbase.createCollection(collectionName)
+                            .then(function(dbCollection) {
+                                dbCollection.insertOne({
+                                    "url":element["_id"]["url"],
+                                    "access-count":element["count"],
+                                    "digest":element["_id"]["url"].hashCode()
+                                });
+                            });
+                    }
+                });
+            });
+    }
+
+    updateThreshold() {
+        // Update threshold for different types of site.
+    }
+
+    findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
+        // console.log("Start Finding Duplicates...");
+        MongoClient.connect(dbUrl)
+            .then(function(db) {
+                let dbase = db.db("YPTN-Client");
+                dbase.createCollection(collectionName)
+                    .then(function(dbCollection) {
+                        // console.log("Collection Switched!");
+                        dbCollection.aggregate([
+                            {
+                                $group: {
+                                    _id: {url: "$url"},
+                                    count: {$sum: 1}},
+                            }
+                        ]).toArray((err, res) => {
+                            // console.log(res);
+                            // DO something with the res
+                            updateRanking(dbase, res, "access-ranking", 5);
+                        });
+                    }).catch(function(err) {
+                    console.log(err);
+                });
+            }).catch(function(err) {
+            console.log("Change DB went wrong");
+        });
+    }
+
+    isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, websocket) {
+        MongoClient.connect(dbUrl)
+            .then(function(db) {
+                let dbase = db.db("YPTN-Client");
+                dbase.createCollection(collectionName)
+                    .then(function(dbCollection) {
+                        dbCollection.findOne({"url":msg["url"]}, (err, res) => {
+                            if(err) {console.log(err);}
+                            else {
+                                if(!res) {
+                                    console.log("Not frequently accessed");
+                                    websocket.emit("AccessFrequencyCheck", "false");
+                                }
+                                else {
+                                    // console.log("Find frequently accesses site: ", res);
+                                    websocket.emit("AccessFrequencyCheck", "true");
+                                }
+                            }
+                        });
+
+                    });
+            });
+    }
+
+
+
+
+
+
+
+
+}
+
 class nodeConnetcion {
-    
+
 }
 
 
