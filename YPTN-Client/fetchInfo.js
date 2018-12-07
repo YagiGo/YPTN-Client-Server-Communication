@@ -249,7 +249,7 @@ function pageChange(requestDetails, websocket=ws) {
             console.log("%c Redirecting will start", 'background: #222; color: #bada55');
             requestCacheFromEdge(websocket)
                 .then(cacheURL => {
-                    redirectToCache(requestDetails.url, cacheURL);
+                    // redirectToCache(requestDetails.url, cacheURL);
                 });
         }
 	}
