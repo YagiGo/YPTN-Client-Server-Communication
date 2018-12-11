@@ -254,6 +254,7 @@ let express = require("express");
 let app = express();
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
+let update = require("./selfUpdate");
 // let mhtml2html = require("mhtml2html");
 // let mhtml = require("mhtml");
 
@@ -372,7 +373,7 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, webso
                 if(err) {console.log(err);}
                 else {
                     if(!res) {
-                        console.log("Not frequently accessed");
+                        console.log(msg["url"], " is not frequently accessed");
                         websocket.emit("AccessFrequencyCheck", "false");
                     }
                     else {
@@ -390,7 +391,7 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
     MongoClient.connect(dbUrl)
         .then(function(db) {
             let dbase = db.db("YPTN-Client");
-            console.log("DB Connected");
+            // console.log("DB Connected");
             dbase.createCollection(collectionName)
                 .then(function (dbCollection) {
                     dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
@@ -401,7 +402,7 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
                             });
                         }
                         else {
-                            console.log("Has been cached at ")
+                            console.log("Has been cached at ", collectionName)
                         }
                     });
                 });
@@ -441,7 +442,7 @@ function hashToCreateUrl(url) {
             const hashedResult = sha256sum.read();
             // console.log(hashedResult.toString('hex')); // hash result here
             resolve(path.join(path.dirname("__dirname"), "/temp/", hashedResult.toString('hex')));
-        });
+        } );
     });
 
 }
@@ -547,22 +548,23 @@ io.on("connection", (ws) => {
         }
         console.log("Start caching site");
         let storedData = {
-            "cache": msg.cache,
             "digest": msg.digest,
             "identity": msg.identity,
             "timeStamp": msg.timeStamp,
             "url": msg.url,
             "initUpdateGap": 3600000
-
+        // Remove cache in the saved object
         };
-        saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "mhtml-cache", storedData);
+        update.update(msg.url);
+        saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "cache-info", storedData);
     });
 });
 
 // Run the self-update
 let selfUpdateTaskInit = setInterval(() => {
     console.log("This is the original cache self update task, executed every 1 hour by default");
-}, 1000);
+    update.update("https://www.yahoo.co.jp");
+}, 60000);
 
 
     // ws.on('message', function(msg) {
