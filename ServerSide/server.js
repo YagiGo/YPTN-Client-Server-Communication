@@ -254,8 +254,8 @@ let express = require("express");
 let app = express();
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
-let mhtml2html = require("mhtml2html");
-let mhtml = require("mhtml");
+// let mhtml2html = require("mhtml2html");
+// let mhtml = require("mhtml");
 
 String.prototype.hashCode = function() {
 	let hash = 0;
@@ -551,12 +551,19 @@ io.on("connection", (ws) => {
             "digest": msg.digest,
             "identity": msg.identity,
             "timeStamp": msg.timeStamp,
-            "url": msg.url
+            "url": msg.url,
+            "initUpdateGap": 3600000
 
         };
         saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "mhtml-cache", storedData);
     });
 });
+
+// Run the self-update
+let selfUpdateTaskInit = setInterval(() => {
+    console.log("This is the original cache self update task, executed every 1 hour by default");
+}, 1000);
+
 
     // ws.on('message', function(msg) {
     //     try
