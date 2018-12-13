@@ -16,84 +16,32 @@ const {URL} = require("url");
 let JSSoup = require("jssoup").default;
 
 async function modifyDependency(filePath, tagName) {
-        fs.readFile(filePath, "utf-8", (err, data) => {
-            if(err) {console.error(err);}
-            // console.log(data);
-            let soup = new JSSoup(data);
-            soup.findAll(tagName, (scriptTag) => {
-                console.log("Find One");
-                let srcDependency = {};
-                scriptTag.forEach(item => {
-                    console.log(item);
-                    if(item.attrs['src'] !== undefined) {
-                        try{
-                            let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                            console.log(path.pathname);
-                            srcDependency[item.attrs['src']] = path.pathname;
-                            item = path.hostname
-                        } catch (e) {
-                            let path = item.attrs['src']; // Probably local dependency here.
-                            console.log(path);
-                            // No need to change the dependency
-                        }
-                    }
-                });
-                console.log(srcDependency);
-                return srcDependency;
-            });
-
-            /*
-            let scriptTag = soup.findAll('script').forEach(
-                item => {
-                    if(item.attrs['src'] !== undefined) {
-                        try{
-                            let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                            // console.log(path.pathname);
-                            // TODO Change the dependency here
-                            item = path.hostname
-                        } catch (e) {
-                            let path = item.attrs['src'] // Probably local dependency here.
-                            // console.log(path);
-                            // No need to change the dependency
-                        }
-                    }
+    fs.readFile(filePath, "utf-8", (err, data) => {
+        if (err) {
+            console.error(err);
+        }
+        // console.log(data);
+        let soup = new JSSoup(data);
+        let tags = soup.findAll(tagName);
+        let srcDependency = {};
+        tags.forEach(item => {
+            if (item.attrs['src'] !== undefined) {
+                // console.log(item.attrs['src'])
+                try {
+                    let path = new URL(item.attrs['src']); // Need to be converted to local dependency
+                    srcDependency[item.attrs['src']] = path.pathname;
+                    // item = path.hostname
+                } catch (e) {
+                    // let path = item.attrs['src']; // Probably local dependency here.
+                    // console.log(path);
+                    // console.log(path);
+                    // No need to change the dependency
                 }
-            );
-            */
-            /*
-            let modifyImgTag = new Promise((resolve, reject) => {
-                soup.findAll('img', (imgTag) => {
-                    imgTag.forEach(
-                            item => {
-                                if(item.attrs['src'] !== undefined) {
-                                    try{
-                                        let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                                        console.log(path.pathname);
-                                        // TODO Change the dependency here
-                                    } catch (e) {
-                                        let path = item.attrs['src']; // Probably local dependency here.
-                                        console.log(path);
-                                        // No need to change the dependency
-                                    }
-                                }
-                            }
-                        );
-                    console.log(imgTag);
-                    resolve(imgTag);
-                    reject("Failed");
-                })
-            });
-            */
-
-            // console.log(imgTag, scriptTag);
-            // resolve(imgTag, scriptTag);
-
-            //console.log(soup.findAll('script').forEach(item => {console.log(item.attrs)}))
-
-            // console.log(tag);
-            // console.log(tag.attrs)
-
+            }
         });
+        console.log(srcDependency);
+        return srcDependency;
+    });
 }
 
 async function update(urlToFetch) {
@@ -102,6 +50,7 @@ async function update(urlToFetch) {
     const page = await browser.newPage();
     const url = new URL(urlToFetch);
     const rootCachePath = `./output/${url.hostname}`;
+    const indexPath = rootCachePath + '/index.html';
 
     /* 2 */
     // page.on('request', async (request) => {
@@ -128,7 +77,7 @@ async function update(urlToFetch) {
     });
 
     /* 3 */
-    page.goto(urlToFetch, {
+    await page.goto(urlToFetch, {
         waitUntil: 'networkidle2'
     })
         .then(response => {
@@ -138,7 +87,7 @@ async function update(urlToFetch) {
             console.log(indexPath);
 
         });
-    console.log("INFO:", await page.title());
+    // console.log("INFO:", await page.title());
     /* 4 */
     // Change the src
 
@@ -153,6 +102,9 @@ async function update(urlToFetch) {
         await browser.close();
     }, 2000 * 4);
 
+    const scriptSrcs = await modifyDependency(indexPath, "script");
+    const imgSrcs = await modifyDependency(indexPath, "img");
+    console.log(scriptSrcs, imgSrcs);
 
 }
 
@@ -160,4 +112,6 @@ module.exports = {
     update
 };
 
-update("https://www.yahoo.co.jp");
+
+
+update("https://www.google.com");

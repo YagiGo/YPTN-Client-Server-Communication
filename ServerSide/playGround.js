@@ -15,6 +15,8 @@
  */
 const fs = require("fs-extra");
 let JSSoup = require("jssoup").default;
+const {URL} = require("url");
+
 async function modifyDependency(filePath, tagName) {
     fs.readFile(filePath, "utf-8", (err, data) => {
         if(err) {console.error(err);}
@@ -24,17 +26,17 @@ async function modifyDependency(filePath, tagName) {
         let srcDependency = {};
         tags.forEach(item => {
             if(item.attrs['src'] !== undefined) {
+                // console.log(item.attrs['src'])
                 try{
                     let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                    console.log(path.pathname);
                     srcDependency[item.attrs['src']] = path.pathname;
-                    item = path.hostname
+                    // item = path.hostname
                 } catch (e) {
-                    let path = item.attrs['src']; // Probably local dependency here.
-                    console.log(path);
+                    // let path = item.attrs['src']; // Probably local dependency here.
+                    // console.log(path);
+                    // console.log(path);
                     // No need to change the dependency
                 }
-            console.log(srcDependency);
             }
         });
             console.log(srcDependency);
@@ -93,7 +95,7 @@ async function modifyDependency(filePath, tagName) {
         // console.log(tag.attrs)
 
 }
-const rootCachePath = "./output/www.yahoo.co.jp";
+const rootCachePath = "./output/www.imdb.com";
 console.log(rootCachePath+"/index.html");
 modifyDependency(rootCachePath+"/index.html", "script")
     .then(modifiedSrcs => {
