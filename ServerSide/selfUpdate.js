@@ -22,7 +22,9 @@ function modifyDependency(filePath) {
             // console.log(data);
             let soup = new JSSoup(data);
             soup.findAll('script', (scriptTag) => {
+                console.log("Find One");
                 scriptTag.forEach(item => {
+                    console.log(item);
                     if(item.attrs['src'] !== undefined) {
                         try{
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
@@ -35,7 +37,7 @@ function modifyDependency(filePath) {
                             // No need to change the dependency
                         }
                     }
-                })
+                });
                 resolve(scriptTag);
             });
 
@@ -141,6 +143,11 @@ async function update(urlToFetch) {
         });
 
     /* 4 */
+
+    const scripts = await page.$$eval("scripts", scripts => {
+        console.log(scripts);
+    });
+
     setTimeout(async () => {
         await browser.close();
     }, 2000 * 4);
