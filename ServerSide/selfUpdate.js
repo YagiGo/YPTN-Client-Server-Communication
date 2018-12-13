@@ -16,6 +16,61 @@ const {URL} = require("url");
 let JSSoup = require("jssoup").default;
 
 async function modifyDependency(filePath, tagName) {
+    fs.readFile(filePath, "utf-8")
+        .then((data) => {
+            // if(err) console.error(err);
+            let soup = new JSSoup(data);
+            let tags = soup.findAll(tagName);
+            let srcDependency = {};
+            tags.forEach(item => {
+                if (item.attrs['src'] !== undefined) {
+                    // console.log(item.attrs['src'])
+                    try {
+                        let path = new URL(item.attrs['src']); // Need to be converted to local dependency
+                        srcDependency[item.attrs['src']] = path.pathname.substr(1);
+                        // item = path.hostname
+                    } catch (e) {
+                        // let path = item.attrs['src']; // Probably local dependency here.
+                        // console.log(path);
+                        // console.log(path);
+                        // No need to change the dependency
+                    }
+                }
+            });
+             //console.log(srcDependency);
+             return new Promise(resolve => {
+                 resolve(srcDependency);
+             })
+
+        })
+        .then(srcDependency => {
+            // Now let's modify the original file
+            fs.readFile(filePath, "utf-8")
+                .then(data => {
+                    // replace all the dependencies into the local ones
+                    for(key in srcDependency) {
+                        // Use regular expression to replace all
+                        let regExp = new RegExp(key, "g");
+                        console.log(key, srcDependency[key]);
+                        data = data.replace(regExp, srcDependency[key]);
+                    }
+                    console.log(data);
+                    return new Promise(((resolve, reject) => {
+                        resolve(data);
+                        resolve("replace failed");
+                    }))
+                })
+                .then(data =>{
+                    // Lastly, write the modified files back
+                    fs.writeFile(filePath, data)
+                        .then(err=>{
+                            if(err) {console.error("ERROR: Recreating file failed");}
+                            console.log("INFO: Recreating file succeeded");
+                        })
+                }).catch(e => {console.error("ERROR:", e);});
+            // console.log(srcDependency);
+    });
+    /*
     fs.readFile(filePath, "utf-8", (err, data) => {
         if (err) {
             console.error(err);
@@ -42,6 +97,11 @@ async function modifyDependency(filePath, tagName) {
         console.log(srcDependency);
         return srcDependency;
     });
+    */
+}
+
+async function checkIfModified() {
+    /* Check the cached files are modified or not */
 }
 
 async function update(urlToFetch) {
@@ -57,7 +117,7 @@ async function update(urlToFetch) {
     //     console.log(request.headers());
     // });
 
-    page.on('response', async (response) => {
+    await page.on('response', async (response) => {
 
         // console.log(url);
         try {
@@ -98,13 +158,14 @@ async function update(urlToFetch) {
     // const scriptSrc = await page.$$eval("script", script => {return script;});
     // console.log(scriptSrc);
 
+    await modifyDependency(indexPath, "script");
+    await modifyDependency(indexPath, "img");
+
     setTimeout(async () => {
         await browser.close();
     }, 2000 * 4);
 
-    const scriptSrcs = await modifyDependency(indexPath, "script");
-    const imgSrcs = await modifyDependency(indexPath, "img");
-    console.log(scriptSrcs, imgSrcs);
+    // console.log(scriptSrcs, imgSrcs);
 
 }
 
@@ -114,4 +175,4 @@ module.exports = {
 
 
 
-update("https://www.google.com");
+update("https://www.imdb.com");
