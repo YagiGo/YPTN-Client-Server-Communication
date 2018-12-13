@@ -15,21 +15,21 @@ const path = require("path");
 const {URL} = require("url");
 let JSSoup = require("jssoup").default;
 
-function modifyDependency(filePath) {
-    return new Promise(resolve => {
+async function modifyDependency(filePath, tagName) {
         fs.readFile(filePath, "utf-8", (err, data) => {
             if(err) {console.error(err);}
             // console.log(data);
             let soup = new JSSoup(data);
-            soup.findAll('script', (scriptTag) => {
+            soup.findAll(tagName, (scriptTag) => {
                 console.log("Find One");
+                let srcDependency = {};
                 scriptTag.forEach(item => {
                     console.log(item);
                     if(item.attrs['src'] !== undefined) {
                         try{
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
                             console.log(path.pathname);
-                            // TODO Change the dependency here
+                            srcDependency[item.attrs['src']] = path.pathname;
                             item = path.hostname
                         } catch (e) {
                             let path = item.attrs['src']; // Probably local dependency here.
@@ -38,7 +38,8 @@ function modifyDependency(filePath) {
                         }
                     }
                 });
-                resolve(scriptTag);
+                console.log(srcDependency);
+                return srcDependency;
             });
 
             /*
@@ -93,7 +94,6 @@ function modifyDependency(filePath) {
             // console.log(tag.attrs)
 
         });
-    });
 }
 
 async function update(urlToFetch) {
@@ -136,17 +136,18 @@ async function update(urlToFetch) {
             let indexPath = path.resolve(`./output/${url.hostname}/index.html`);
             // Now modify the dependencies in the index HTML
             console.log(indexPath);
-            modifyDependency(indexPath)
-                .then((scriptTag) => {
-                    console.log(scriptTag);
-                })
+
         });
-
+    console.log("INFO:", await page.title());
     /* 4 */
+    // Change the src
 
-    const scripts = await page.$$eval("scripts", scripts => {
-        console.log(scripts);
-    });
+    // const scripts = await page.$("h2.Companybox__title", scripts => {return scripts});
+    // const imgs = await page.$("img", imgs => {return imgs.length;});
+
+    // console.log(scripts, imgs);
+    // const scriptSrc = await page.$$eval("script", script => {return script;});
+    // console.log(scriptSrc);
 
     setTimeout(async () => {
         await browser.close();
