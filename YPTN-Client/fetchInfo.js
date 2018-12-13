@@ -116,6 +116,7 @@ function sendNewCacheToEdge(websocket, requestDetails) {
                     console.log("Request Details: ", requestDetails);
                     try
                     {
+                        // TODO: Instead of using MHTML, HTML will be used
                         chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
                             function (mhtmlData) {
                                 // console.log("Get site in mhtml form");
