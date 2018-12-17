@@ -16,6 +16,7 @@ const {URL} = require("url"); // URL parse
 let JSSoup = require("jssoup").default; // Beautiful Soup, JS version
 // let DBInteract = require("./server"); // DB related Interactions
 let md5 = require("js-md5"); // MD5 for digest
+let fileDigest = {}; // Record digest of every file sent from web servers
 
 async function modifyDependency(filePath, tagNames) {
     fs.readFile(filePath, "utf-8")
@@ -23,11 +24,11 @@ async function modifyDependency(filePath, tagNames) {
             // if(err) console.error(err);
             let soup = new JSSoup(data);
             let srcDependency = {};
-            for(let tagName in tagNames) {
-                let tags = soup.findAll(tagName);
+            for (let tagName in tagNames) {
+                let tags = soup.findAll(tagNames[tagName]);
                 tags.forEach(item => {
                     if (item.attrs['src'] !== undefined) {
-                        // console.log(item.attrs['src'])
+                        console.log(item.attrs['src'])
                         try {
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
                             srcDependency[item.attrs['src']] = path.pathname.substr(1);
@@ -41,18 +42,19 @@ async function modifyDependency(filePath, tagNames) {
                     }
                 });
             }
-             //console.log(srcDependency);
-             return new Promise(resolve => {
-                 resolve(srcDependency);
-             })
+            //console.log(srcDependency);
+            return new Promise(resolve => {
+                resolve(srcDependency);
+            })
 
         })
         .then(srcDependency => {
             // Now let's modify the original file
+            console.log(srcDependency);
             fs.readFile(filePath, "utf-8")
                 .then(data => {
                     // replace all the dependencies into the local ones
-                    for(let key in srcDependency) {
+                    for (let key in srcDependency) {
                         // Use regular expression to replace all
                         // let regExp = new RegExp(key, "g");
                         console.log(key, srcDependency[key]);
@@ -65,16 +67,20 @@ async function modifyDependency(filePath, tagNames) {
                         resolve("replace failed");
                     }))
                 })
-                .then(data =>{
+                .then(data => {
                     // Lastly, write the modified files back
                     fs.writeFile(filePath, data)
-                        .then(err=>{
-                            if(err) {console.error("ERROR: Recreating file failed");}
+                        .then(err => {
+                            if (err) {
+                                console.error("ERROR: Recreating file failed");
+                            }
                             console.log("INFO: Recreating file succeeded");
                         })
-                }).catch(e => {console.error("ERROR:", e);});
+                }).catch(e => {
+                console.error("ERROR:", e);
+            });
             // console.log(srcDependency);
-    });
+        });
     /*
     fs.readFile(filePath, "utf-8", (err, data) => {
         if (err) {
@@ -103,14 +109,13 @@ async function modifyDependency(filePath, tagNames) {
         return srcDependency;
     });
     */
-}
 
-            //console.log(soup.findAll('script').forEach(item => {console.log(item.attrs)}))
 
-            // console.log(tag);
-            // console.log(tag.attrs)
+    //console.log(soup.findAll('script').forEach(item => {console.log(item.attrs)}))
 
-        });
+    // console.log(tag);
+    // console.log(tag.attrs)
+
 }
 
 async function isCacheModified(urlToFetch) {
@@ -118,12 +123,10 @@ async function isCacheModified(urlToFetch) {
     const indexPath = `./output/${url.hostname}/index.html`;
     console.log("INFO FROM MODIFIED:", indexPath);
     await update(urlToFetch);
-    /*
     fs.readFile(indexPath, "utf-8", (err, data) => {
         if(err) console.error("ERROR:", err);
         console.log(md5(data));
         });
-    */
 }
 
 async function update(urlToFetch) {
@@ -171,7 +174,7 @@ async function update(urlToFetch) {
 
         });
     // Modify dependency here
-    // await modifyDependency(indexPath, ["script", "img"]);
+    await modifyDependency(indexPath, ["script", "img"]);
     setTimeout(async () => {
         await browser.close();
     }, 2000 * 3);
@@ -198,10 +201,10 @@ module.exports = {
 
 
 
-update("https://www.imdb.com");
+// update("https://www.imdb.com");
 
 
 
 // update("https://www.bing.com/");
-isCacheModified("https://www.twitter.com/");
+isCacheModified("https://www.yahoo.co.jp");
 
