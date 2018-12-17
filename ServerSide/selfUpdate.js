@@ -177,9 +177,9 @@ async function update(urlToFetch) {
             console.log(indexPath);
             console.log(fileDigest);
             // Write the file Digest into the system folder
-            fs.writeFile(digestPath, "utf-8", fileDigest.toString())
+            fs.writeFile(digestPath, JSON.stringify(fileDigest))
                 .then(() => {
-                    console.log("INFO: Digest completed");
+                    console.log("INFO: Writing Digest to", digestPath);
                 })
         });
     // Modify dependency here
