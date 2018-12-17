@@ -28,7 +28,7 @@ async function modifyDependency(filePath, tagNames) {
                 let tags = soup.findAll(tagNames[tagName]);
                 tags.forEach(item => {
                     if (item.attrs['src'] !== undefined) {
-                        console.log(item.attrs['src'])
+                        console.log(item.attrs['src']);
                         try {
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
                             srcDependency[item.attrs['src']] = path.pathname.substr(1);
@@ -50,21 +50,21 @@ async function modifyDependency(filePath, tagNames) {
         })
         .then(srcDependency => {
             // Now let's modify the original file
-            console.log(srcDependency);
+            // console.log(srcDependency);
             fs.readFile(filePath, "utf-8")
                 .then(data => {
                     // replace all the dependencies into the local ones
                     for (let key in srcDependency) {
                         // Use regular expression to replace all
                         // let regExp = new RegExp(key, "g");
-                        console.log(key, srcDependency[key]);
+                        // console.log(key, srcDependency[key]);
                         // console.log(regExp);
                         data = data.replace(key, srcDependency[key]);
                     }
                     // console.log(data);
                     return new Promise(((resolve, reject) => {
                         resolve(data);
-                        resolve("replace failed");
+                        reject("replace failed");
                     }))
                 })
                 .then(data => {
@@ -148,12 +148,15 @@ async function update(urlToFetch) {
         try {
             const requestedPath = new URL(response.url());
             let filePath = path.resolve(`./output/${url.hostname}${requestedPath.pathname}`);
+            console.log(filePath);
             // console.log(requestedPath.pathname);
             // console.log(path.extname(requestedPath.pathname));
             if (path.extname(requestedPath.pathname).trim() === '') {
                 filePath = `${filePath}/index.html`;
             }
             // Modify all the depended path to the local ones
+            // Now I need a JSON file to track the digest of requested file
+            fileDigest[filePath] = md5(await response.buffer());
             await fs.outputFile(filePath, await response.buffer());
         }
         catch(err) {
@@ -167,11 +170,17 @@ async function update(urlToFetch) {
     })
         .then(response => {
             console.log(urlToFetch, "caching process finished with code", response.status());
-            let indexPath = path.resolve(`./output/${url.hostname}/index.html`);
+            let rootPath = path.resolve(`./output/${url.hostname}`);
+            let indexPath = path.resolve(`${rootPath}/index.html`);
+            let digestPath = path.resolve(`${rootPath}/digest.json`);
             // Now modify the dependencies in the index HTML
             console.log(indexPath);
-
-
+            console.log(fileDigest);
+            // Write the file Digest into the system folder
+            fs.writeFile(digestPath, "utf-8", fileDigest.toString())
+                .then(() => {
+                    console.log("INFO: Digest completed");
+                })
         });
     // Modify dependency here
     await modifyDependency(indexPath, ["script", "img"]);
