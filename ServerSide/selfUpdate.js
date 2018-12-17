@@ -17,78 +17,93 @@ let JSSoup = require("jssoup").default; // Beautiful Soup, JS version
 // let DBInteract = require("./server"); // DB related Interactions
 let md5 = require("js-md5"); // MD5 for digest
 
-async function modifyDependency(filePath, tagName) {
-        fs.readFile(filePath, "utf-8", (err, data) => {
-            if(err) {console.error(err);}
-            // console.log(data);
+async function modifyDependency(filePath, tagNames) {
+    fs.readFile(filePath, "utf-8")
+        .then((data) => {
+            // if(err) console.error(err);
             let soup = new JSSoup(data);
-            soup.findAll(tagName, (scriptTag) => {
-                console.log("Find One");
-                let srcDependency = {};
-                scriptTag.forEach(item => {
-                    console.log(item);
-                    if(item.attrs['src'] !== undefined) {
-                        try{
+            let srcDependency = {};
+            for(let tagName in tagNames) {
+                let tags = soup.findAll(tagName);
+                tags.forEach(item => {
+                    if (item.attrs['src'] !== undefined) {
+                        // console.log(item.attrs['src'])
+                        try {
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                            console.log(path.pathname);
-                            srcDependency[item.attrs['src']] = path.pathname;
-                            item = path.hostname
+                            srcDependency[item.attrs['src']] = path.pathname.substr(1);
+                            // item = path.hostname
                         } catch (e) {
-                            let path = item.attrs['src']; // Probably local dependency here.
-                            console.log(path);
-                            // No need to change the dependency
-                        }
-                    }
-                });
-                console.log(srcDependency);
-                return srcDependency;
-            });
-
-            /*
-            let scriptTag = soup.findAll('script').forEach(
-                item => {
-                    if(item.attrs['src'] !== undefined) {
-                        try{
-                            let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                            // console.log(path.pathname);
-                            // TODO Change the dependency here
-                            item = path.hostname
-                        } catch (e) {
-                            let path = item.attrs['src'] // Probably local dependency here.
+                            // let path = item.attrs['src']; // Probably local dependency here.
+                            // console.log(path);
                             // console.log(path);
                             // No need to change the dependency
                         }
                     }
-                }
-            );
-            */
-            /*
-            let modifyImgTag = new Promise((resolve, reject) => {
-                soup.findAll('img', (imgTag) => {
-                    imgTag.forEach(
-                            item => {
-                                if(item.attrs['src'] !== undefined) {
-                                    try{
-                                        let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                                        console.log(path.pathname);
-                                        // TODO Change the dependency here
-                                    } catch (e) {
-                                        let path = item.attrs['src']; // Probably local dependency here.
-                                        console.log(path);
-                                        // No need to change the dependency
-                                    }
-                                }
-                            }
-                        );
-                    console.log(imgTag);
-                    resolve(imgTag);
-                    reject("Failed");
-                })
-            });
-            */
+                });
+            }
+             //console.log(srcDependency);
+             return new Promise(resolve => {
+                 resolve(srcDependency);
+             })
 
-            // console.log(imgTag, scriptTag);
-            // resolve(imgTag, scriptTag);
+        })
+        .then(srcDependency => {
+            // Now let's modify the original file
+            fs.readFile(filePath, "utf-8")
+                .then(data => {
+                    // replace all the dependencies into the local ones
+                    for(let key in srcDependency) {
+                        // Use regular expression to replace all
+                        // let regExp = new RegExp(key, "g");
+                        console.log(key, srcDependency[key]);
+                        // console.log(regExp);
+                        data = data.replace(key, srcDependency[key]);
+                    }
+                    // console.log(data);
+                    return new Promise(((resolve, reject) => {
+                        resolve(data);
+                        resolve("replace failed");
+                    }))
+                })
+                .then(data =>{
+                    // Lastly, write the modified files back
+                    fs.writeFile(filePath, data)
+                        .then(err=>{
+                            if(err) {console.error("ERROR: Recreating file failed");}
+                            console.log("INFO: Recreating file succeeded");
+                        })
+                }).catch(e => {console.error("ERROR:", e);});
+            // console.log(srcDependency);
+    });
+    /*
+    fs.readFile(filePath, "utf-8", (err, data) => {
+        if (err) {
+            console.error(err);
+        }
+        // console.log(data);
+        let soup = new JSSoup(data);
+        let tags = soup.findAll(tagName);
+        let srcDependency = {};
+        tags.forEach(item => {
+            if (item.attrs['src'] !== undefined) {
+                // console.log(item.attrs['src'])
+                try {
+                    let path = new URL(item.attrs['src']); // Need to be converted to local dependency
+                    srcDependency[item.attrs['src']] = path.pathname;
+                    // item = path.hostname
+                } catch (e) {
+                    // let path = item.attrs['src']; // Probably local dependency here.
+                    // console.log(path);
+                    // console.log(path);
+                    // No need to change the dependency
+                }
+            }
+        });
+        console.log(srcDependency);
+        return srcDependency;
+    });
+    */
+}
 
             //console.log(soup.findAll('script').forEach(item => {console.log(item.attrs)}))
 
@@ -124,7 +139,7 @@ async function update(urlToFetch) {
     //     console.log(request.headers());
     // });
 
-    await page.on('response', async (response) => {
+    page.on('response', async (response) => {
 
         // console.log(url);
         try {
@@ -161,6 +176,7 @@ async function update(urlToFetch) {
         await browser.close();
     }, 2000 * 3);
     console.log("INFO:", await page.title());
+    // console.log("INFO:", await page.title());
     /* 4 */
     // Change the src
 
@@ -176,8 +192,13 @@ async function update(urlToFetch) {
 
 }
 
-// Check if the cache changed by checking the digest
+module.exports = {
+    update
+};
 
+
+
+update("https://www.imdb.com");
 
 
 
