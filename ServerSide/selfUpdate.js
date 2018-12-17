@@ -9,11 +9,13 @@
 //     console.log(stdOut)
 // });
 // Get a website's url with puppeteer
-const puppeteer = require('puppeteer');
-const fs = require("fs-extra");
-const path = require("path");
-const {URL} = require("url");
-let JSSoup = require("jssoup").default;
+const puppeteer = require('puppeteer'); // Headless chromium browser
+const fs = require("fs-extra"); // fs that supports Promise
+const path = require("path"); // path related
+const {URL} = require("url"); // URL parse
+let JSSoup = require("jssoup").default; // Beautiful Soup, JS version
+// let DBInteract = require("./server"); // DB related Interactions
+let md5 = require("js-md5"); // MD5 for digest
 
 async function modifyDependency(filePath, tagName) {
         fs.readFile(filePath, "utf-8", (err, data) => {
@@ -96,19 +98,33 @@ async function modifyDependency(filePath, tagName) {
         });
 }
 
+async function isCacheModified(urlToFetch) {
+    const url = new URL(urlToFetch);
+    const indexPath = `./output/${url.hostname}/index.html`;
+    console.log("INFO FROM MODIFIED:", indexPath);
+    await update(urlToFetch);
+    /*
+    fs.readFile(indexPath, "utf-8", (err, data) => {
+        if(err) console.error("ERROR:", err);
+        console.log(md5(data));
+        });
+    */
+}
+
 async function update(urlToFetch) {
     /* 1 */
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     const url = new URL(urlToFetch);
     const rootCachePath = `./output/${url.hostname}`;
+    const indexPath = rootCachePath + '/index.html';
 
     /* 2 */
     // page.on('request', async (request) => {
     //     console.log(request.headers());
     // });
 
-    page.on('response', async (response) => {
+    await page.on('response', async (response) => {
 
         // console.log(url);
         try {
@@ -128,7 +144,7 @@ async function update(urlToFetch) {
     });
 
     /* 3 */
-    page.goto(urlToFetch, {
+    await page.goto(urlToFetch, {
         waitUntil: 'networkidle2'
     })
         .then(response => {
@@ -137,7 +153,13 @@ async function update(urlToFetch) {
             // Now modify the dependencies in the index HTML
             console.log(indexPath);
 
+
         });
+    // Modify dependency here
+    // await modifyDependency(indexPath, ["script", "img"]);
+    setTimeout(async () => {
+        await browser.close();
+    }, 2000 * 3);
     console.log("INFO:", await page.title());
     /* 4 */
     // Change the src
@@ -149,15 +171,16 @@ async function update(urlToFetch) {
     // const scriptSrc = await page.$$eval("script", script => {return script;});
     // console.log(scriptSrc);
 
-    setTimeout(async () => {
-        await browser.close();
-    }, 2000 * 4);
+
 
 
 }
 
-module.exports = {
-    update
-};
+// Check if the cache changed by checking the digest
 
-update("https://www.yahoo.co.jp");
+
+
+
+// update("https://www.bing.com/");
+isCacheModified("https://www.twitter.com/");
+

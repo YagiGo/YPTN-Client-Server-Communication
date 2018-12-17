@@ -237,12 +237,13 @@ let WebSocketServer = require('ws').Server;
 // wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://localhost:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
 const fs = require("fs");
 const crypto = require("crypto"); // hashing url
 const path = require("path"); // file path issue
 const nStatic = require("node-static");
 let fileServer = new nStatic.Server('./temp');
+let md5 = require("js-md5");
 
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
@@ -286,6 +287,11 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                     if(err) {console.log(err);}
                     else if(res) {
                         // console.log("Find duplicates: ", res);
+                        // This one have been cached before
+                        if(collectionName == "cache-info") {
+                            // This stores cache site info, now need to see if the cache changed or not
+
+                        }
                     }
                     else {
                         dbCollection.insertOne(dataObject, (err, res) =>{});
@@ -552,10 +558,11 @@ io.on("connection", (ws) => {
             "identity": msg.identity,
             "timeStamp": msg.timeStamp,
             "url": msg.url,
+            "url-digest": md5(msg.url),
             "initUpdateGap": 3600000
         // Remove cache in the saved object
         };
-        update.update(msg.url);
+        // update.update(msg.url);
         saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "cache-info", storedData);
     });
 });
@@ -658,3 +665,8 @@ let selfUpdateTaskInit = setInterval(() => {
 //         }
 //     });
 // });
+// Export some functions
+module.exports = {
+    writeDataintoDB,
+    loadCacheFromDB
+};
