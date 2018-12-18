@@ -16,7 +16,6 @@ const {URL} = require("url"); // URL parse
 let JSSoup = require("jssoup").default; // Beautiful Soup, JS version
 // let DBInteract = require("./server"); // DB related Interactions
 let md5 = require("js-md5"); // MD5 for digest
-let fileDigest = {}; // Record digest of every file sent from web servers
 
 async function modifyDependency(filePath, tagNames) {
     fs.readFile(filePath, "utf-8")
@@ -28,7 +27,7 @@ async function modifyDependency(filePath, tagNames) {
                 let tags = soup.findAll(tagNames[tagName]);
                 tags.forEach(item => {
                     if (item.attrs['src'] !== undefined) {
-                        console.log(item.attrs['src']);
+                        // console.log(item.attrs['src']);
                         try {
                             let path = new URL(item.attrs['src']); // Need to be converted to local dependency
                             srcDependency[item.attrs['src']] = path.pathname.substr(1);
@@ -121,11 +120,11 @@ async function modifyDependency(filePath, tagNames) {
 async function isCacheModified(urlToFetch) {
     const url = new URL(urlToFetch);
     const indexPath = `./output/${url.hostname}/index.html`;
-    console.log("INFO FROM MODIFIED:", indexPath);
+    // console.log("INFO FROM MODIFIED:", indexPath);
     await update(urlToFetch);
     fs.readFile(indexPath, "utf-8", (err, data) => {
         if(err) console.error("ERROR:", err);
-        console.log(md5(data));
+        // console.log(md5(data));
         });
 }
 
@@ -136,6 +135,9 @@ async function update(urlToFetch) {
     const url = new URL(urlToFetch);
     const rootCachePath = `./output/${url.hostname}`;
     const indexPath = rootCachePath + '/index.html';
+    const digestPath = path.resolve(`${rootCachePath}/digest.json`);
+
+    let fileDigest = {}; // Record digest of every file sent from web servers
 
     /* 2 */
     // page.on('request', async (request) => {
@@ -148,7 +150,17 @@ async function update(urlToFetch) {
         try {
             const requestedPath = new URL(response.url());
             let filePath = path.resolve(`./output/${url.hostname}${requestedPath.pathname}`);
-            console.log(filePath);
+            let digestPath = path.resolve(`./output/${url.hostname}/digest.json`);
+            let fileStructure = `${url.hostname}${requestedPath.pathname}`;
+            let previousDigest = {}
+            try {
+                previousDigest = JSON.parse(await fs.readFile(digestPath, "utf-8"));
+            } catch(e) {
+                console.warn("WARN: A new site was requested, no digest at this time");
+            }
+            // console.log(filePath);
+            //Read the previous Digest
+
             // console.log(requestedPath.pathname);
             // console.log(path.extname(requestedPath.pathname));
             if (path.extname(requestedPath.pathname).trim() === '') {
@@ -156,10 +168,22 @@ async function update(urlToFetch) {
             }
             // Modify all the depended path to the local ones
             // Now I need a JSON file to track the digest of requested file
-            fileDigest[filePath] = md5(await response.buffer());
+            let newHashValue = md5(await response.buffer());
+            if(previousDigest[fileStructure] === md5(await response.buffer())) {
+                console.log("INFO: file remained the same as previous cached");
+                // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
+            }
+            else {
+                console.log("INFO: file was modified since previous cached");
+                // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
+
+            }
+            fileDigest[fileStructure] = md5(await response.buffer());
             await fs.outputFile(filePath, await response.buffer());
         }
         catch(err) {
+            // TODO Cancel comment
+            // console.error(err);
             console.warn("WARN: redirect responses occurred, could not be cached");
         }
     });
@@ -172,10 +196,10 @@ async function update(urlToFetch) {
             console.log(urlToFetch, "caching process finished with code", response.status());
             let rootPath = path.resolve(`./output/${url.hostname}`);
             let indexPath = path.resolve(`${rootPath}/index.html`);
-            let digestPath = path.resolve(`${rootPath}/digest.json`);
+            // let digestPath = path.resolve(`${rootPath}/digest.json`);
             // Now modify the dependencies in the index HTML
-            console.log(indexPath);
-            console.log(fileDigest);
+            // console.log(indexPath);
+            // console.log(fileDigest);
             // Write the file Digest into the system folder
             fs.writeFile(digestPath, JSON.stringify(fileDigest))
                 .then(() => {
