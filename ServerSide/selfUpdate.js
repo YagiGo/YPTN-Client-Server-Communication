@@ -16,6 +16,10 @@ const {URL} = require("url"); // URL parse
 let JSSoup = require("jssoup").default; // Beautiful Soup, JS version
 // let DBInteract = require("./server"); // DB related Interactions
 let md5 = require("js-md5"); // MD5 for digest
+const INIT_UPDATEGAP = 1800000; // Initial update gap
+const MAX_TOLERABLE_UNMODIFIED_TIMES = 3; // Times the server allows before increasing update gap
+const MIN_TOLERABLE_UPDATE_GAP = 225000; // 最短更新间隔 225秒
+const MAX_TOLERABLE_UPDATE_GAP = 86400000; // 最长更新间隔 24小时
 
 async function modifyDependency(filePath, tagNames) {
     fs.readFile(filePath, "utf-8")
@@ -117,21 +121,21 @@ async function modifyDependency(filePath, tagNames) {
 
 }
 
-async function isCacheModified(urlToFetch) {
+async function isCacheModified(urlToFetch, testDigestOutputPath) {
     const url = new URL(urlToFetch);
     const indexPath = `./output/${url.hostname}/index.html`;
-    const updateFrequencyAnalysisPath = path.resolve(`./updateFrequencyAnalysis/${url.hostname}.csv`);
+    // const updateFrequencyAnalysisPath = path.resolve(`./updateFrequencyAnalysis/${url.hostname}.csv`);
     // console.log("INFO FROM MODIFIED:", indexPath);
     // write header info to the analysis csv file
     // fs.writeFile(updateFrequencyAnalysisPath, "URL,Files,Modified Files,Unmodified Files");
-    await update(urlToFetch);
+    await update(urlToFetch, testDigestOutputPath);
     fs.readFile(indexPath, "utf-8", (err, data) => {
         if(err) console.error("ERROR:", err);
         // console.log(md5(data));
         });
 }
 
-async function update(urlToFetch) {
+async function update(urlToFetch, testDigestOutputPath) {
     /* 1 */
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -141,14 +145,18 @@ async function update(urlToFetch) {
     const indexPath = rootCachePath + '/index.html';
     const digestPath = path.resolve(`${rootCachePath}/digest.json`);
     const updateFrequencyAnalysisPath = path.resolve(`./updateFrequencyAnalysis/${url.hostname}.csv`);
-    // Some constants here
-    const INIT_UPDATEGAP = 1800000; // Initial update gap
-    const MAX_TOLERABLE_UNMODIFIED_TIMES = 3; // Times the server allows before increasing update gap
-    const MIN_TOLERABLE_UPDATE_GAP = 225000; // 最短更新间隔 225秒
-    const MAX_TOLERABLE_UPDATE_GAP = 86400000; // 最长更新间隔 24小时
-    const digestTestPath = path.resolve(`./digest/${url.hostname}.json`);
+    // Timestamp and path
+    let current = new Date();
+    let currentTime = Math.floor(current.getTime() / 1000);
+    const fileNameLogDir = path.resolve(`./filePathCheck/${url.hostname}`); // Create the file name path to chekc file name changes
+    if(!fs.existsSync(fileNameLogDir)) {fs.mkdirSync(fileNameLogDir);} // Create file name path sync
+    // create the file name changes log file(txt)
+    const fileNameLogPath = path.resolve(`${fileNameLogDir}/${url.hostname}_${currentTime}.json`);
+    console.log("INFO: File name log path:", fileNameLogPath);
 
+    // const digestTestPath = path.resolve(`./digest/${url.hostname}.json`);
     let fileDigest = {}; // Record digest of every file sent from web servers
+    let fileNameDigest = {}; // Requested name changes and digest changes, FOR TEST PURPOSE
     let fileCounter = 0, modifiedCounter = 0, unmodifiedCounter = 0;
 
     /* 2 */
@@ -163,12 +171,14 @@ async function update(urlToFetch) {
             const requestedPath = new URL(response.url());
             let filePath = path.resolve(`./output/${url.hostname}${requestedPath.pathname}`);
             let digestPath = path.resolve(`./output/${url.hostname}/digest.json`);
-            let fileStructure = `${url.hostname}${requestedPath.pathname}`;
+            // let fileStructure = `${url.hostname}${requestedPath.pathname}`;
+            // let fileStructure = response.url();
+            let fileStructure = md5(await response.buffer());
             let previousDigest = {};
             try {
-                previousDigest = JSON.parse(await fs.readFile(digestTestPath, "utf-8"));
+                previousDigest = JSON.parse(await fs.readFile(testDigestOutputPath, "utf-8"));
             } catch(e) {
-                console.warn("WARN: A new site was requested, no digest at this time");
+                // console.warn("WARN: A new site was requested, no digest at this time");
             }
             // console.log(filePath);
             //Read the previous Digest
@@ -180,32 +190,45 @@ async function update(urlToFetch) {
             }
             // Modify all the depended path to the local ones
             // Now I need a JSON file to track the digest of requested file
-            let newHashValue = md5(await response.buffer());
+            // let newHashValue = md5(await response.buffer());
+
+            // Add info to fileNameLog json file
+            fileNameDigest[fileStructure] =
+                {
+                    "URL": response.url(),
+                    "newlyAdded": 1
+                };
 
             // 每个文件里面都加上详细信息， 包括但不限于摘要，更新间隔, 未更新次数
             let fileInfo = {
-                "digest": "",
+                "URL": "",
                 "updateGap": previousDigest[fileStructure]===undefined? INIT_UPDATEGAP : previousDigest[fileStructure]["updateGap"], // Init updateGap
-                "unmodifiedTimes": 0
+                "unmodifiedTimes": 0,
+                "newlyAdded": 1
             };
-            fileInfo["digest"] =  md5(await response.buffer());
+            fileInfo["URL"] =  response.url();
             fileDigest[fileStructure] = fileInfo;
+            // fs.appendFile(fileNameLogPath, fileStructure + "\n");
 
-            if(previousDigest[fileStructure] === undefined) {} // What if undefined?
+            if(previousDigest[fileStructure] === undefined) {
+                fileCounter += 1;
+                modifiedCounter += 1;
+                console.log("INFO: A new file URL recorded, digest:", fileStructure);
+            } // What if undefined?
 
-
-            else if(previousDigest[fileStructure]["digest"] === md5(await response.buffer())) {
-                // console.log("INFO: file remained the same as previous cached");
+            else if(previousDigest[fileStructure]["URL"] === response.url()) {
+                console.log("INFO: File URL remained the same as previous cached");
                 // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
                 fileCounter += 1;
                 unmodifiedCounter += 1;
-                if(previousDigest[fileStructure] === undefined) {}
-                else if(previousDigest[fileStructure]["unmodifiedTimes"] === MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                fileDigest[fileStructure]["newlyAdded"] = 0;
+                fileNameDigest[fileStructure]["newlyAdded"] = 0;
+                if(previousDigest[fileStructure]["unmodifiedTimes"] === MAX_TOLERABLE_UNMODIFIED_TIMES) {
                     // Reach the threshold, extend update gap and reset counter
                     // TODO More through in the future
                     console.log(previousDigest[fileStructure]["updateGap"]);
 
-                    // Do not excced max tolerable update gap
+                    // Do not exceed max tolerable update gap
                     previousDigest[fileStructure]["updateGap"] < MAX_TOLERABLE_UPDATE_GAP ?
                         fileDigest[fileStructure]["updateGap"] = previousDigest[fileStructure]["updateGap"] * 2:// Extend update gap
                         fileDigest[fileStructure]["updateGap"] = MAX_TOLERABLE_UPDATE_GAP;
@@ -217,10 +240,12 @@ async function update(urlToFetch) {
                 }
             }
             else {
-                // console.log("INFO: file was modified since previous cached");
+                console.log("INFO: file URL was modified since previous cached");
                 // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
                 fileCounter += 1;
                 modifiedCounter += 1;
+                fileDigest[fileStructure]["newlyAdded"] = 0;
+                fileNameDigest[fileStructure]["newlyAdded"] = 0;
                 // shrink update gap, but do not go below the minimum tolerable update gap
                 previousDigest[fileStructure]["updateGap"] <= MIN_TOLERABLE_UPDATE_GAP ?
                     fileDigest[fileStructure]["updateGap"] = MIN_TOLERABLE_UPDATE_GAP :
@@ -245,7 +270,6 @@ async function update(urlToFetch) {
         }
         catch(err) {
 
-            // TODO Cancel comment
             // console.error(err);
             // console.warn("WARN: redirect responses occurred, could not be cached");
         }
@@ -268,10 +292,11 @@ async function update(urlToFetch) {
                 .then(() => {
                     // console.log("INFO: Writing Digest to", digestPath);
                 });
+            fs.writeFile(fileNameLogPath, JSON.stringify(fileNameDigest));
 
             // Write the digest into the digest folder for test purpose
             // WILL BE DELETED
-            fs.writeFile(digestTestPath, JSON.stringify(fileDigest));
+            fs.writeFile(testDigestOutputPath, JSON.stringify(fileDigest));
 
 
             console.log("URL:", urlToFetch, "Files:", fileCounter, "Modified Files:",  modifiedCounter,"Unmodified Files:",  unmodifiedCounter);
@@ -299,19 +324,42 @@ async function update(urlToFetch) {
 
 }
 
+// TODO need a function to update files periodically
+function updateFilePeriodically(urlToFetch) {
+    // urlToFetch: url currently accessing
+    // get the digest json file based on the urlToFetch
+    let url = new URL(urlToFetch);
+    let digestPath = path.resolve(`./digest/${url.hostname}.json`);
+    let timeSinceLastUpdated = 0;
+    fs.readFile(digestPath)
+        .then(binData => {
+            let data = JSON.parse(binData);
+            for(let requestedFileURL in data) {
+                let fileInfo = data[requestedFileURL];
+                let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
+                console.log(updateGap)
+            }
+
+        })
+        .catch(err => {
+            console.error(err);
+        })
+
+}
+
 module.exports = {
     update
 };
 
 
 
+
+/* =======================================  Test Filed  =================================================== */
 // update("https://www.imdb.com");
-
-
-
 // update("https://www.bing.com/");
 
-let testSiteSet = [
+
+const testSiteSet = [
     "https://www.google.com", // 検索サイト
     "https://www.yahoo.co.jp", // 検索サイト
     "https://www.baidu.com", // Search Engine
@@ -324,15 +372,49 @@ let testSiteSet = [
     "https://www.reddit.com",　//　一般的なサイト
     "https://news.yahoo.com",　//　一般的なサイト
     "https://www.softlab.cs.tsukuba.ac.jp", //アクセス数は相対的に少ないサイト
-    "https://www.zhaoxinblog.com/"　//アクセス数は相対的に少ないサイト
+    "https://www.zhaoxinblog.com/",　//アクセス数は相対的に少ないサイト
+    "https://www.bbc.com",
+    "https://www.cnn.com",
+    "https://news.yahoo.co.jp"
 ];
 
-let testSetMin = [
-    "https://www.softlab.cs.tsukuba.ac.jp"
-]
-testSiteSet.forEach(url => {
-    console.log("Start analyzing", url);
-    isCacheModified(url);
-});
 
 
+// testSiteSet.forEach(urlToFetch => {
+//     console.log("Start analyzing", urlToFetch);
+//     url = new URL(urlToFetch);
+//     const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+//     console.log(updateFrequencyAnalysisPath);
+//     isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+// });
+
+function evaluate(startTimestamp, endTimestamp) {
+    let current = new Date();
+    let currentTime = Math.floor(current.getTime() / 1000);
+    let startTime = new Date(startTimestamp * 1e3).toISOString().slice(-13, -5);
+    let endTime = new Date(endTimestamp * 1e3).toISOString().slice(-13, -5);
+    console.log("This evaluation will start at", startTime, "GMT", "and end at", endTime, "GMT");
+    while (currentTime < startTimestamp) {
+        current = new Date();
+        currentTime = Math.floor(current.getTime() / 1000);
+    }
+    console.warn("Task begins, don't shut off the computer!!!");
+    let index = 1;
+    let taskID = setInterval(() => {
+        console.log("Evaluation No.", index);
+        index += 1;
+        testSiteSet.forEach(urlToFetch => {
+            url = new URL(urlToFetch);
+            const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+            // console.log(updateFrequencyAnalysisPath);
+            isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+            current = new Date();
+            currentTime = Math.floor(current.getTime() / 1000);
+            if (currentTime > endTimestamp) {
+                clearInterval(taskID);
+            }
+        });}, 600000);
+}
+
+evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
+// updateFilePeriodically("https://www.softlab.cs.tsukuba.ac.jp");
