@@ -151,8 +151,8 @@ async function update(urlToFetch, testDigestOutputPath) {
     const fileNameLogDir = path.resolve(`./filePathCheck/${url.hostname}`); // Create the file name path to chekc file name changes
     if(!fs.existsSync(fileNameLogDir)) {fs.mkdirSync(fileNameLogDir);} // Create file name path sync
     // create the file name changes log file(txt)
-    const fileNameLogPath = path.resolve(`${fileNameLogDir}/${url.hostname}_${currentTime}.json`);
-    console.log("INFO: File name log path:", fileNameLogPath);
+    // const fileNameLogPath = path.resolve(`${fileNameLogDir}/${url.hostname}_${currentTime}.json`);
+    // console.log("INFO: File name log path:", fileNameLogPath);
 
     // const digestTestPath = path.resolve(`./digest/${url.hostname}.json`);
     let fileDigest = {}; // Record digest of every file sent from web servers
@@ -193,18 +193,20 @@ async function update(urlToFetch, testDigestOutputPath) {
             // let newHashValue = md5(await response.buffer());
 
             // Add info to fileNameLog json file
-            fileNameDigest[fileStructure] =
-                {
-                    "URL": response.url(),
-                    "newlyAdded": 1
-                };
+            // fileNameDigest[fileStructure] =
+            //     {
+            //         "URL": response.url(),
+            //         "newlyAdded": 1
+            //     };
 
-            // 每个文件里面都加上详细信息， 包括但不限于摘要，更新间隔, 未更新次数
+            // 每个文件里面都加上详细信息， 包括但不限于URL，更新间隔, 未更新次数, 上次更新后经过的时间
             let fileInfo = {
                 "URL": "",
                 "updateGap": previousDigest[fileStructure]===undefined? INIT_UPDATEGAP : previousDigest[fileStructure]["updateGap"], // Init updateGap
                 "unmodifiedTimes": 0,
-                "newlyAdded": 1
+                "newlyAdded": 1,
+                "timeSinceLastUpdated": 0,
+                "savedPath": ""
             };
             fileInfo["URL"] =  response.url();
             fileDigest[fileStructure] = fileInfo;
@@ -222,7 +224,7 @@ async function update(urlToFetch, testDigestOutputPath) {
                 fileCounter += 1;
                 unmodifiedCounter += 1;
                 fileDigest[fileStructure]["newlyAdded"] = 0;
-                fileNameDigest[fileStructure]["newlyAdded"] = 0;
+                // fileNameDigest[fileStructure]["newlyAdded"] = 0;
                 if(previousDigest[fileStructure]["unmodifiedTimes"] === MAX_TOLERABLE_UNMODIFIED_TIMES) {
                     // Reach the threshold, extend update gap and reset counter
                     // TODO More through in the future
@@ -245,7 +247,7 @@ async function update(urlToFetch, testDigestOutputPath) {
                 fileCounter += 1;
                 modifiedCounter += 1;
                 fileDigest[fileStructure]["newlyAdded"] = 0;
-                fileNameDigest[fileStructure]["newlyAdded"] = 0;
+                // fileNameDigest[fileStructure]["newlyAdded"] = 0;
                 // shrink update gap, but do not go below the minimum tolerable update gap
                 previousDigest[fileStructure]["updateGap"] <= MIN_TOLERABLE_UPDATE_GAP ?
                     fileDigest[fileStructure]["updateGap"] = MIN_TOLERABLE_UPDATE_GAP :
@@ -292,7 +294,7 @@ async function update(urlToFetch, testDigestOutputPath) {
                 .then(() => {
                     // console.log("INFO: Writing Digest to", digestPath);
                 });
-            fs.writeFile(fileNameLogPath, JSON.stringify(fileNameDigest));
+            // fs.writeFile(fileNameLogPath, JSON.stringify(fileNameDigest));
 
             // Write the digest into the digest folder for test purpose
             // WILL BE DELETED
@@ -325,17 +327,19 @@ async function update(urlToFetch, testDigestOutputPath) {
 }
 
 // TODO need a function to update files periodically
-function updateFilePeriodically(urlToFetch) {
+async function updateFilePeriodically(urlToFetch) {
     // urlToFetch: url currently accessing
     // get the digest json file based on the urlToFetch
     let url = new URL(urlToFetch);
     let digestPath = path.resolve(`./digest/${url.hostname}.json`);
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
     let timeSinceLastUpdated = 0;
     fs.readFile(digestPath)
         .then(binData => {
             let data = JSON.parse(binData);
-            for(let requestedFileURL in data) {
-                let fileInfo = data[requestedFileURL];
+            for(let requestedFileDigest in data) {
+                let fileInfo = data[requestedFileDigest];
                 let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
                 console.log(updateGap)
             }
@@ -416,5 +420,5 @@ function evaluate(startTimestamp, endTimestamp) {
         });}, 600000);
 }
 
-evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
+// evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
 // updateFilePeriodically("https://www.softlab.cs.tsukuba.ac.jp");
