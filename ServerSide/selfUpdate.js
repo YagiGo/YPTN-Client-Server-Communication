@@ -264,7 +264,7 @@ async function update(urlToFetch, testDigestOutputPath) {
             //             unmodifiedTimes: 1
             //          }
             // }
-
+            fileDigest[fileStructure]["savedPath"] = filePath;
             // console.log(fileDigest[fileStructure])
             await fs.outputFile(filePath, await response.buffer());
             // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
@@ -332,16 +332,17 @@ async function updateFilePeriodically(urlToFetch) {
     // get the digest json file based on the urlToFetch
     let url = new URL(urlToFetch);
     let digestPath = path.resolve(`./digest/${url.hostname}.json`);
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
+    // const browser = await puppeteer.launch();
+    // const page = await browser.newPage();
     let timeSinceLastUpdated = 0;
     fs.readFile(digestPath)
         .then(binData => {
             let data = JSON.parse(binData);
             for(let requestedFileDigest in data) {
                 let fileInfo = data[requestedFileDigest];
-                let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
-                console.log(updateGap)
+                // let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
+                console.log(fileInfo)
+
             }
 
         })
@@ -350,47 +351,6 @@ async function updateFilePeriodically(urlToFetch) {
         })
 
 }
-
-module.exports = {
-    update
-};
-
-
-
-
-/* =======================================  Test Filed  =================================================== */
-// update("https://www.imdb.com");
-// update("https://www.bing.com/");
-
-
-const testSiteSet = [
-    "https://www.google.com", // 検索サイト
-    "https://www.yahoo.co.jp", // 検索サイト
-    "https://www.baidu.com", // Search Engine
-    "https://www.facebook.com",　// SNS
-    "https://www.twitter.com", // SNS
-    "https://www.youtube.com", // 動画サイト
-    "https://www.wikipedia.org", // 一般的なテクストの多いサイト
-    "https://www.taobao.com", 　// ショッピングサイト
-    "https://www.amazon.com",　// ショッピングサイト
-    "https://www.reddit.com",　//　一般的なサイト
-    "https://news.yahoo.com",　//　一般的なサイト
-    "https://www.softlab.cs.tsukuba.ac.jp", //アクセス数は相対的に少ないサイト
-    "https://www.zhaoxinblog.com/",　//アクセス数は相対的に少ないサイト
-    "https://www.bbc.com",
-    "https://www.cnn.com",
-    "https://news.yahoo.co.jp"
-];
-
-
-
-// testSiteSet.forEach(urlToFetch => {
-//     console.log("Start analyzing", urlToFetch);
-//     url = new URL(urlToFetch);
-//     const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
-//     console.log(updateFrequencyAnalysisPath);
-//     isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
-// });
 
 function evaluate(startTimestamp, endTimestamp) {
     let current = new Date();
@@ -420,5 +380,51 @@ function evaluate(startTimestamp, endTimestamp) {
         });}, 600000);
 }
 
+module.exports = {
+    update
+};
+
+
+
+
+/* =======================================  Test Filed  =================================================== */
+// update("https://www.imdb.com");
+// update("https://www.bing.com/");
+
+
+const testSiteSet = [
+    "https://www.google.com", // 検索サイト
+    "https://www.yahoo.co.jp", // 検索サイト
+    "https://www.baidu.com", // Search Engine
+    "https://www.facebook.com",　// SNS
+    "https://www.twitter.com", // SNS
+    "https://www.youtube.com", // 動画サイト
+    "https://www.wikipedia.org", // 一般的なテクストの多いサイト
+    "https://www.taobao.com", 　// ショッピングサイト
+    "https://www.amazon.com",　// ショッピングサイト
+    "https://www.reddit.com",　//　一般的なサイト
+    "https://news.yahoo.com",　//　一般的なサイト
+    "https://www.softlab.cs.tsukuba.ac.jp", //アクセス数は相対的に少ないサイト
+    "https://www.zhaoxinblog.com/",　//アクセス数は相対的に少ないサイト
+    "https://www.bbc.com", // News Site
+    "https://www.cnn.com", // News Site
+    "https://news.yahoo.co.jp" // News Site
+];
+
+// update check function test
+// testSiteSet.forEach(urlToFetch => {
+//     console.log("Start analyzing", urlToFetch);
+//     url = new URL(urlToFetch);
+//     const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+//     console.log(updateFrequencyAnalysisPath);
+//     isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+// });
+
 // evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
 // updateFilePeriodically("https://www.softlab.cs.tsukuba.ac.jp");
+
+// update function check
+testSiteSet.forEach(urlToFetch => {
+    url = new URL(urlToFetch);
+    updateFilePeriodically(urlToFetch)
+});
