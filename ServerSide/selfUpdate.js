@@ -9,6 +9,7 @@
 //     console.log(stdOut)
 // });
 // Get a website's url with puppeteer
+let dbUrl = "mongodb://192.168.96.208:27017";
 const puppeteer = require('puppeteer'); // Headless chromium browser
 const fs = require("fs-extra"); // fs that supports Promise
 const path = require("path"); // path related
@@ -20,6 +21,103 @@ const INIT_UPDATEGAP = 1800000; // Initial update gap
 const MAX_TOLERABLE_UNMODIFIED_TIMES = 3; // Times the server allows before increasing update gap
 const MIN_TOLERABLE_UPDATE_GAP = 225000; // 最短更新间隔 225秒
 const MAX_TOLERABLE_UPDATE_GAP = 86400000; // 最长更新间隔 24小时
+let MongoClient = require("mongodb").MongoClient;
+
+/*=================DB ACCESS======================*/
+async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fileInfo) {
+    MongoClient.connect(dbURL)
+        .then((db) => {
+            let dbase = db.db(dbName);
+            dbase.createCollection(collectionName)
+                .then(collection => {
+                    collection.find({"_id": fileInfo["_id"]}).toArray(function(err, result) {
+                        if(result.length === 0) {
+                            collection.find({"URL": fileInfo["URL"]}).toArray(function(err, result) {
+                                if(err) throw err;
+                                if(result.length === 0) {
+                                    // 没有找到对应的MD5和URL的文件，表明此文件可能是新加的
+                                    collection.insertOne(fileInfo, (err) => {if(err) throw err;})
+                                }
+                                else{
+                                    for(let index in result) {
+                                        // MD5值变了但是URL不变，表示源文件发生了变化
+                                        let savedFileInfo = result[index];
+                                        let updateValues = {
+                                            $set: {
+                                                updateGap: savedFileInfo["updateGap"] < MIN_TOLERABLE_UPDATE_GAP?
+                                                    MIN_TOLERABLE_UPDATE_GAP : Math.round(savedFileInfo["updateGap"] / 2),
+                                                unmodifiedTimes: 0,
+                                                newlyAdded: 0,
+                                                timeSinceLastUpdated: 0,
+                                                savedPath: fileInfo["savedPath"]
+                                            }
+                                        };
+                                        collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) throw err;})
+                                    }
+                                }
+                            });
+                        }
+                        else{
+                            // MD5值没变，源文件没有发生变化
+                            for(let index in result) {
+                                let savedFileInfo = result[index];
+                                // console.log(savedFileInfo["updateGap"], savedFileInfo["unmodifiedTimes"]);
+
+                                if (savedFileInfo["updateGap"] < MAX_TOLERABLE_UPDATE_GAP && savedFileInfo["unmodifiedTimes"] < MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap: savedFileInfo["updateGap"],
+                                            unmodifiedTimes: savedFileInfo["unmodifiedTimes"] + 1,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    };
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                                else if (savedFileInfo["unmodifiedTimes"] >= MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap:  savedFileInfo["updateGap"] * 2,
+                                            unmodifiedTimes: 0,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    };
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                                else if (savedFileInfo["updateGap"] >= MAX_TOLERABLE_UPDATE_GAP) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap:  MAX_TOLERABLE_UPDATE_GAP,
+                                            unmodifiedTimes: 0,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    }
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                            }
+                        }
+                    })
+                })
+                .catch(err => {
+                    if(err) {console.warn("Collection has been created, jumping to the collection")}
+                })
+        })
+}
+
+async function checkDigestInDB(MongoClient, dbURL, dbName, collectionName) {
+
+}
 
 async function modifyDependency(filePath, tagNames) {
     fs.readFile(filePath, "utf-8")
@@ -170,104 +268,25 @@ async function update(urlToFetch, testDigestOutputPath) {
         try {
             const requestedPath = new URL(response.url());
             let filePath = path.resolve(`./output/${url.hostname}${requestedPath.pathname}`);
-            let digestPath = path.resolve(`./output/${url.hostname}/digest.json`);
-            // let fileStructure = `${url.hostname}${requestedPath.pathname}`;
-            // let fileStructure = response.url();
+            // let digestPath = path.resolve(`./output/${url.hostname}/digest.json`);
             let fileStructure = md5(await response.buffer());
-            let previousDigest = {};
-            try {
-                previousDigest = JSON.parse(await fs.readFile(testDigestOutputPath, "utf-8"));
-            } catch(e) {
-                // console.warn("WARN: A new site was requested, no digest at this time");
-            }
-            // console.log(filePath);
-            //Read the previous Digest
-
-            // console.log(requestedPath.pathname);
-            // console.log(path.extname(requestedPath.pathname));
             if (path.extname(requestedPath.pathname).trim() === '') {
                 filePath = `${filePath}/index.html`;
             }
-            // Modify all the depended path to the local ones
-            // Now I need a JSON file to track the digest of requested file
-            // let newHashValue = md5(await response.buffer());
-
-            // Add info to fileNameLog json file
-            // fileNameDigest[fileStructure] =
-            //     {
-            //         "URL": response.url(),
-            //         "newlyAdded": 1
-            //     };
 
             // 每个文件里面都加上详细信息， 包括但不限于URL，更新间隔, 未更新次数, 上次更新后经过的时间
             let fileInfo = {
-                "URL": "",
-                "updateGap": previousDigest[fileStructure]===undefined? INIT_UPDATEGAP : previousDigest[fileStructure]["updateGap"], // Init updateGap
+                "_id": fileStructure,
+                "URL": response.url(),
+                "updateGap": INIT_UPDATEGAP, // Init updateGap
                 "unmodifiedTimes": 0,
                 "newlyAdded": 1,
                 "timeSinceLastUpdated": 0,
-                "savedPath": ""
+                "savedPath": filePath
             };
-            fileInfo["URL"] =  response.url();
-            fileDigest[fileStructure] = fileInfo;
-            // fs.appendFile(fileNameLogPath, fileStructure + "\n");
-
-            if(previousDigest[fileStructure] === undefined) {
-                fileCounter += 1;
-                modifiedCounter += 1;
-                console.log("INFO: A new file URL recorded, digest:", fileStructure);
-            } // What if undefined?
-
-            else if(previousDigest[fileStructure]["URL"] === response.url()) {
-                console.log("INFO: File URL remained the same as previous cached");
-                // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
-                fileCounter += 1;
-                unmodifiedCounter += 1;
-                fileDigest[fileStructure]["newlyAdded"] = 0;
-                // fileNameDigest[fileStructure]["newlyAdded"] = 0;
-                if(previousDigest[fileStructure]["unmodifiedTimes"] === MAX_TOLERABLE_UNMODIFIED_TIMES) {
-                    // Reach the threshold, extend update gap and reset counter
-                    // TODO More through in the future
-                    console.log(previousDigest[fileStructure]["updateGap"]);
-
-                    // Do not exceed max tolerable update gap
-                    previousDigest[fileStructure]["updateGap"] < MAX_TOLERABLE_UPDATE_GAP ?
-                        fileDigest[fileStructure]["updateGap"] = previousDigest[fileStructure]["updateGap"] * 2:// Extend update gap
-                        fileDigest[fileStructure]["updateGap"] = MAX_TOLERABLE_UPDATE_GAP;
-
-                    fileDigest[fileStructure]["unmodifiedTimes"] = 1 // reset counter
-                }
-                else {
-                    fileDigest[fileStructure]["unmodifiedTimes"] = previousDigest[fileStructure]["unmodifiedTimes"] + 1
-                }
-            }
-            else {
-                console.log("INFO: file URL was modified since previous cached");
-                // console.log("Previous:",previousDigest[filePath], "This time:",newHashValue);
-                fileCounter += 1;
-                modifiedCounter += 1;
-                fileDigest[fileStructure]["newlyAdded"] = 0;
-                // fileNameDigest[fileStructure]["newlyAdded"] = 0;
-                // shrink update gap, but do not go below the minimum tolerable update gap
-                previousDigest[fileStructure]["updateGap"] <= MIN_TOLERABLE_UPDATE_GAP ?
-                    fileDigest[fileStructure]["updateGap"] = MIN_TOLERABLE_UPDATE_GAP :
-                    fileDigest[fileStructure]["updateGap"] = Math.round(previousDigest[fileStructure]["updateGap"] / 2);
-
-
-
-            }
-            // Data Structure for digest
-            // {
-            //     URL: {
-            //             digest: xxxxxx,
-            //             updateGap: 1800,
-            //             unmodifiedTimes: 1
-            //          }
-            // }
-            fileDigest[fileStructure]["savedPath"] = filePath;
-            // console.log(fileDigest[fileStructure])
             await fs.outputFile(filePath, await response.buffer());
             // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
+            writeDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
 
         }
         catch(err) {
@@ -284,25 +303,7 @@ async function update(urlToFetch, testDigestOutputPath) {
         .then(response => {
             // console.log(urlToFetch, "caching process finished with code", response.status());
             let rootPath = path.resolve(`./output/${url.hostname}`);
-            let indexPath = path.resolve(`${rootPath}/index.html`);
-            // let digestPath = path.resolve(`${rootPath}/digest.json`);
-            // Now modify the dependencies in the index HTML
-            // console.log(indexPath);
-            // console.log(fileDigest);
-            // Write the file Digest into the system folder
-            fs.writeFile(digestPath, JSON.stringify(fileDigest))
-                .then(() => {
-                    // console.log("INFO: Writing Digest to", digestPath);
-                });
-            // fs.writeFile(fileNameLogPath, JSON.stringify(fileNameDigest));
-
-            // Write the digest into the digest folder for test purpose
-            // WILL BE DELETED
-            fs.writeFile(testDigestOutputPath, JSON.stringify(fileDigest));
-
-
-            console.log("URL:", urlToFetch, "Files:", fileCounter, "Modified Files:",  modifiedCounter,"Unmodified Files:",  unmodifiedCounter);
-            fs.appendFile(updateFrequencyAnalysisPath, "\n" + urlToFetch + "," + fileCounter + "," + modifiedCounter + "," + unmodifiedCounter)
+            // let indexPath = path.resolve(`${rootPath}/index.html`);
         });
     // Modify dependency here
     await modifyDependency(indexPath, ["script", "img"]);
@@ -332,19 +333,21 @@ async function updateFilePeriodically(urlToFetch) {
     // get the digest json file based on the urlToFetch
     let url = new URL(urlToFetch);
     let digestPath = path.resolve(`./digest/${url.hostname}.json`);
-    // const browser = await puppeteer.launch();
-    // const page = await browser.newPage();
-    let timeSinceLastUpdated = 0;
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    let timeSinceLastExecuted = 0; // 计数一共运行了多少秒，如果到了86400则清0
     fs.readFile(digestPath)
         .then(binData => {
             let data = JSON.parse(binData);
             for(let requestedFileDigest in data) {
                 let fileInfo = data[requestedFileDigest];
                 // let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
-                console.log(fileInfo)
+                console.log(fileInfo);
+                setInterval(() => {
+                    let filePath = fileInfo["savedPath"];
 
+                }, 225000)
             }
-
         })
         .catch(err => {
             console.error(err);
@@ -411,20 +414,25 @@ const testSiteSet = [
     "https://news.yahoo.co.jp" // News Site
 ];
 
+const testSiteSet2 = [
+    "https://www.softlab.cs.tsukuba.ac.jp", //アクセス数は相対的に少ないサイト
+    "https://www.zhaoxinblog.com/",　//アクセス数は相対的に少ないサイト
+];
+
 // update check function test
-// testSiteSet.forEach(urlToFetch => {
-//     console.log("Start analyzing", urlToFetch);
-//     url = new URL(urlToFetch);
-//     const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
-//     console.log(updateFrequencyAnalysisPath);
-//     isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
-// });
+testSiteSet2.forEach(urlToFetch => {
+    console.log("Start analyzing", urlToFetch);
+    url = new URL(urlToFetch);
+    const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+    console.log(updateFrequencyAnalysisPath);
+    isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+});
 
 // evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
 // updateFilePeriodically("https://www.softlab.cs.tsukuba.ac.jp");
 
 // update function check
-testSiteSet.forEach(urlToFetch => {
-    url = new URL(urlToFetch);
-    updateFilePeriodically(urlToFetch)
-});
+// testSiteSet.forEach(urlToFetch => {
+//     url = new URL(urlToFetch);
+//     updateFilePeriodically(urlToFetch)
+// });
