@@ -103,15 +103,15 @@
 //         console.log("INFO: modified srcs: ", modifiedSrcs);
 //     });
 
-let test = "123252"
-let replaceJSON = {"1":"a", "2":"b"};
-
-for(key in replaceJSON) {
-    console.log(regExp);
-    test = test.replace(regExp, replaceJSON[key]);
-}
-
-console.log(test);
+// let test = "123252"
+// let replaceJSON = {"1":"a", "2":"b"};
+//
+// for(key in replaceJSON) {
+//     console.log(regExp);
+//     test = test.replace(regExp, replaceJSON[key]);
+// }
+//
+// console.log(test);
 /*
 function replaceWithJSON(string, replaceJSON) {
     let newString = string;
@@ -135,4 +135,112 @@ replaceWithJSON(test, replaceJSON)
         console.log(e);
     });
 */
+/*
+let MongoClient = require("mongodb").MongoClient;
+let dbUrl = "mongodb://192.168.96.208:27017";
+async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fileInfo) {
+    MongoClient.connect(dbURL)
+        .then((db) => {
+            let dbase = db.db(dbName);
+            dbase.createCollection(collectionName)
+                .then(collection => {
+                    collection.find({"_id": fileInfo["_id"]}).toArray(function(err, result) {
+                        if(result.length === 0) {
+                            collection.find({"URL": fileInfo["URL"]}).toArray(function(err, result) {
+                                if(err) throw err;
+                                if(result.length === 0) {
+                                    // 没有找到对应的MD5和URL的文件，表明此文件可能是新加的
+                                    collection.insertOne(fileInfo, (err) => {if(err) throw err;})
+                                }
+                                else{
+                                    for(let index in result) {
+                                        // MD5值变了但是URL不变，表示源文件发生了变化
+                                        let savedFileInfo = result[index];
+                                        let updateValues = {
+                                            $set: {
+                                                updateGap: savedFileInfo["updateGap"] < MIN_TOLERABLE_UPDATE_GAP?
+                                                    MIN_TOLERABLE_UPDATE_GAP : Math.round(savedFileInfo["updateGap"] / 2),
+                                                unmodifiedTimes: 0,
+                                                newlyAdded: 0,
+                                                timeSinceLastUpdated: 0,
+                                                savedPath: fileInfo["savedPath"]
+                                            }
+                                        };
+                                        collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) throw err;})
+                                    }
+                                }
+                            });
+                        }
+                        else{
+                            // MD5值没变，源文件没有发生变化
+                            for(let index in result) {
+                                let savedFileInfo = result[index];
+                                // console.log(savedFileInfo["updateGap"], savedFileInfo["unmodifiedTimes"]);
+
+                                if (savedFileInfo["updateGap"] < MAX_TOLERABLE_UPDATE_GAP && savedFileInfo["unmodifiedTimes"] < MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap: savedFileInfo["updateGap"],
+                                            unmodifiedTimes: savedFileInfo["unmodifiedTimes"] + 1,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    };
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                                else if (savedFileInfo["unmodifiedTimes"] >= MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap:  savedFileInfo["updateGap"] * 2,
+                                            unmodifiedTimes: 0,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    };
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                                else if (savedFileInfo["updateGap"] >= MAX_TOLERABLE_UPDATE_GAP) {
+                                    let updateValues = {
+                                        $set: {
+                                            URL: fileInfo["URL"],
+                                            updateGap:  MAX_TOLERABLE_UPDATE_GAP,
+                                            unmodifiedTimes: 0,
+                                            newlyAdded: 0,
+                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                            savedPath: fileInfo["savedPath"]
+                                        }
+                                    }
+                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                }
+
+                            }
+                        }
+                    })
+                })
+                .catch(err => {
+                    if(err) {console.warn("Collection has been created, jumping to the collection")}
+                })
+        })
+}
+
+writeDigestintoDB(MongoClient, dbUrl, "eshi_analysis", "eshi_info")
+*/
+
+let MongoClient = require("mongodb").MongoClient;
+let dbUrl = "mongodb://192.168.96.208:27017";
+
+MongoClient.connect(dbUrl)
+    .then(async db=>{
+        let dbase = db.db("YPTN-Server");
+        let collectionNames = await dbase.listCollections().toArray();
+        for(let index in collectionNames) {
+            console.log(collectionNames[index]["name"])
+        }
+    });
 

@@ -9,7 +9,9 @@
 //     console.log(stdOut)
 // });
 // Get a website's url with puppeteer
-let dbUrl = "mongodb://192.168.96.208:27017";
+const dbUrl = "mongodb://192.168.96.208:27017";
+const dbName = "YPTN-Server";
+
 const puppeteer = require('puppeteer'); // Headless chromium browser
 const fs = require("fs-extra"); // fs that supports Promise
 const path = require("path"); // path related
@@ -115,9 +117,6 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
         })
 }
 
-async function checkDigestInDB(MongoClient, dbURL, dbName, collectionName) {
-
-}
 
 async function modifyDependency(filePath, tagNames) {
     fs.readFile(filePath, "utf-8")
@@ -219,6 +218,7 @@ async function modifyDependency(filePath, tagNames) {
 
 }
 
+// update digest, execute every 30 minutes
 async function isCacheModified(urlToFetch, testDigestOutputPath) {
     const url = new URL(urlToFetch);
     const indexPath = `./output/${url.hostname}/index.html`;
@@ -299,12 +299,8 @@ async function update(urlToFetch, testDigestOutputPath) {
     /* 3 */
     await page.goto(urlToFetch, {
         waitUntil: 'networkidle2'
-    })
-        .then(response => {
-            // console.log(urlToFetch, "caching process finished with code", response.status());
-            let rootPath = path.resolve(`./output/${url.hostname}`);
-            // let indexPath = path.resolve(`${rootPath}/index.html`);
-        });
+    });
+
     // Modify dependency here
     await modifyDependency(indexPath, ["script", "img"]);
     setTimeout(async () => {
@@ -327,34 +323,94 @@ async function update(urlToFetch, testDigestOutputPath) {
 
 }
 
-// TODO need a function to update files periodically
-async function updateFilePeriodically(urlToFetch) {
+// TODO need a function to update files periodically, every 225s
+async function updateFilePeriodically() {
     // urlToFetch: url currently accessing
     // get the digest json file based on the urlToFetch
-    let url = new URL(urlToFetch);
-    let digestPath = path.resolve(`./digest/${url.hostname}.json`);
+    // let digestPath = path.resolve(`./digest/${url.hostname}.json`);
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     let timeSinceLastExecuted = 0; // 计数一共运行了多少秒，如果到了86400则清0
-    fs.readFile(digestPath)
-        .then(binData => {
-            let data = JSON.parse(binData);
-            for(let requestedFileDigest in data) {
-                let fileInfo = data[requestedFileDigest];
-                // let updateGap = fileInfo["updateGap"] // We only need the updateGap to perform update
-                console.log(fileInfo);
-                setInterval(() => {
-                    let filePath = fileInfo["savedPath"];
+    // Access DB to get the digest
+    MongoClient.connect(dbUrl)
+        .then(async db => {
+            let dbase = db.db(dbName);
+            let collectionNames = await dbase.listCollections().toArray();
+            for (let index in collectionNames) {
+                let urlToFetch = collectionNames[index]["name"];
+                console.log("DEBUG: Going to collection", urlToFetch);
+                dbase.createCollection(urlToFetch)
+                    .then(async (collection) => {
+                        setInterval(() => {
+                            collection.find({}).toArray(async (err, result) =>
+                            {
+                                if (err) throw err;
+                                console.log(result);
+                                for (let index in result) {
+                                    let fileInfo = result[index];
+                                    console.log(fileInfo);
+                                    console.log("DEBUG: Time since last updated:", fileInfo["timeSinceLastUpdated"]);
+                                    console.log("DEBUG: Update gap:", fileInfo["updateGap"]);
+                                    console.log("DEBUG: Requesting URL:", fileInfo["URL"]);
+                                    if (fileInfo["timeSinceLastUpdated"] > fileInfo["updateGap"]) {
+                                        // Time to update cache
+                                        console.log("DEBUG: WILL BE UPDATED")
+                                        await page.goto(fileInfo["URL"], {
+                                            waitUntil: 'networkidle2'
+                                        });
 
-                }, 225000)
+                                        await page.on('response', async (response) => {
+
+                                            // console.log(url);
+                                            try {
+                                                console.log("DEBUG: Save new cache to path", fileInfo["savedPath"]);
+                                                await fs.outputFile(fileInfo["savedPath"], await response.buffer());
+                                                // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
+                                                // writeDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
+                                                collection.updateOne({"_id": fileInfo["_id"]},
+                                                    {
+                                                        $set: {
+                                                            unmodifiedTimes: 0,
+                                                            timeSinceLastUpdated: 0
+                                                        }
+                                                    });
+
+                                                if (timeSinceLastExecuted >= MAX_TOLERABLE_UPDATE_GAP) {
+                                                    timeSinceLastExecuted = 0;
+                                                }
+
+                                            }
+                                            catch (err) {
+
+                                                // console.error(err);
+                                                // console.warn("WARN: redirect responses occurred, could not be cached");
+
+                                            }
+                                        });
+                                    }
+
+                                    else {
+                                        console.log("DEBUG: Will not be updated");
+                                        collection.updateOne({"_id": fileInfo["_id"]},
+                                            {
+                                                $set: {
+                                                    timeSinceLastUpdated: fileInfo["timeSinceLastUpdated"] + 225000
+                                                }
+                                            });
+                                    }
+                                }
+                            });
+                            timeSinceLastExecuted += 225000;
+                        }, 225000)
+                    }).catch(err => {
+                    console.error(err);
+                })
             }
-        })
-        .catch(err => {
-            console.error(err);
-        })
-
+        });
 }
 
+
+// For benchmark
 function evaluate(startTimestamp, endTimestamp) {
     let current = new Date();
     let currentTime = Math.floor(current.getTime() / 1000);
@@ -384,10 +440,9 @@ function evaluate(startTimestamp, endTimestamp) {
 }
 
 module.exports = {
-    update
+    isCacheModified,
+    updateFilePeriodically
 };
-
-
 
 
 /* =======================================  Test Filed  =================================================== */
@@ -417,16 +472,18 @@ const testSiteSet = [
 const testSiteSet2 = [
     "https://www.softlab.cs.tsukuba.ac.jp", //アクセス数は相対的に少ないサイト
     "https://www.zhaoxinblog.com/",　//アクセス数は相対的に少ないサイト
+    "http://www.tsukuba.ac.jp/", // Univ. Tsukuba
 ];
 
 // update check function test
 testSiteSet2.forEach(urlToFetch => {
-    console.log("Start analyzing", urlToFetch);
-    url = new URL(urlToFetch);
-    const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
-    console.log(updateFrequencyAnalysisPath);
-    isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+console.log("Start analyzing", urlToFetch);
+url = new URL(urlToFetch);
+const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+console.log(updateFrequencyAnalysisPath);
+isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
 });
+// updateFilePeriodically();
 
 // evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
 // updateFilePeriodically("https://www.softlab.cs.tsukuba.ac.jp");
