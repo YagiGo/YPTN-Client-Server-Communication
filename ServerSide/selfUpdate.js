@@ -9,8 +9,9 @@
 //     console.log(stdOut)
 // });
 // Get a website's url with puppeteer
-const dbUrl = "mongodb://192.168.96.208:27017";
-const dbName = "YPTN-Server";
+const config = require("./config");
+const dbUrl = config.DBUrl();
+const dbName = config.config["development"]["DB"]["ServerSideDB"];
 
 const puppeteer = require('puppeteer'); // Headless chromium browser
 const fs = require("fs-extra"); // fs that supports Promise

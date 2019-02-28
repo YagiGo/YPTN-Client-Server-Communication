@@ -1,6 +1,7 @@
 // Set up HTTP/2 connection between client and edge server
 
 const fs = require('fs'); // For cert
+const DBMiddleware = require("./Middlewares/DbMiddleware.js"); // Database middleware
 const path = require('path');
 // eslint-disable-next-line
 const http2 = require('http2');
@@ -14,6 +15,13 @@ const server = http2.createSecureServer({
     cert: fs.readFileSync(path.join(__dirname, '../testSSL/server.crt')),
     key: fs.readFileSync(path.join(__dirname, '../testSSL/server.key'))
 }, onRequest);
+const serverSideDB = "YPTN-Server";
+const clientSideDB = "YPTN-Client";
+const cacheInfo = "cache-info";
+const MongoClient = require("mongodb").MongoClient();
+const dbURL = "mongodb://192.168.96.208";
+
+
 
 // Push file
 function push (stream, path) {

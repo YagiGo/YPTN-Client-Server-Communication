@@ -36,7 +36,7 @@ String.prototype.hashCode = function() {
 	}
 	return hash;
 };
-
+/**********************ToBeRemoved***************************/
 function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
     MongoClient.connect(dbUrl)
     .then(function(db) {
@@ -88,6 +88,9 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
         console.log("Change DB went wrong: ", err);
     });
 }
+/*********************ToBeRemoved**************************/
+
+
 /*
 function removeDuplicateHeaders(dbCollection, keyWord) {
     console.log("Start Finding Duplicates");
@@ -170,7 +173,7 @@ function isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, webso
         });
     });
 }
-
+/*************** ToBeRemoved ******************/
 function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
     MongoClient.connect(dbUrl)
         .then(function(db) {
@@ -218,7 +221,7 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
             });
     })
 }
-
+/********************ToBeRemoved***********************/
 function hashToCreateUrl(url) {
     let sha256sum = crypto.createHash('sha256'); // Use sha256 to hash the url to create a url for client to redirect
 
@@ -233,7 +236,7 @@ function hashToCreateUrl(url) {
     });
 
 }
-
+/********************ToBeRemoved***********************/
 function hasSearchResultinDB(MongoClient, dbUrl, dbName, collectionName, query)
 {
     return new Promise((resolve, reject) => {
@@ -251,7 +254,7 @@ function hasSearchResultinDB(MongoClient, dbUrl, dbName, collectionName, query)
             })
     });
 }
-
+/********************ToBeRemoved***********************/
 function sendCacheURLBack(path, websocket) {
     /*
     return new Promise((resolve, reject) => {

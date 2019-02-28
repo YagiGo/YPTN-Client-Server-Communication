@@ -244,4 +244,7 @@ writeDigestintoDB(MongoClient, dbUrl, "eshi_analysis", "eshi_info")
 //         }
 //     });
 
-console.log(__dirname)
+// console.log(__dirname)
+const config = require("./config");
+console.log(config.DBUrl())
+console.log(config.config["development"]["DB"]["Addr"])
