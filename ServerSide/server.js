@@ -1,9 +1,10 @@
 // A NodeJS server
 let WebSocketServer = require('ws').Server;
+const config = require("./config");
 // wss = new WebSocketServer({port:8080});
 let requestCache;
 let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.208:27017"; //For test purpose only! Don't use this in the production environment!!!
+let dbUrl = config.DBUrl(); //For test purpose only! Don't use this in the production environment!!!
 const fs = require("fs");
 const crypto = require("crypto"); // hashing url
 const path = require("path"); // file path issue

@@ -11,7 +11,7 @@
 // Get a website's url with puppeteer
 const config = require("./config");
 const dbUrl = config.DBUrl();
-const dbName = config.config["development"]["DB"]["ServerSideDB"];
+const dbName = config.config["development"]["DB"]["serverSideDB"];
 
 const puppeteer = require('puppeteer'); // Headless chromium browser
 const fs = require("fs-extra"); // fs that supports Promise
