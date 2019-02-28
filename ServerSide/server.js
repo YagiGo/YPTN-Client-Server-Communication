@@ -1,237 +1,3 @@
-//Reconstruct the file
-class logging {
-    // Build a systematic logging system.
-}
-
-class connectInstance {
-    constructor(mongoClient, fileSystem, crypto, socketIO) {
-        this.mongoClient = mongoClient;
-        this.fileSystem = fileSystem;
-        this.crypto = crypto;
-        this.socketIO = socketIO;
-    }
-
-}
-
-class dbAccess {
-    constructor(dbURL, port, dbName, client, collectionName) {
-        this.dbURL = dbURL;
-        this.dbPort = port;
-        this.dbName = dbName;
-        this.mongoClient = client;
-        this.collectionName = collectionName
-    }
-
-    set dbCollection(collectionName) {
-        this.collectionName = collectionName; // Change the collection when necessary
-    }
-
-    dbAddr() {
-        return "mongo://" + this.dbURL + ":" + this.dbPort;
-    }
-
-    writeDataintoDB(dataObject) {
-        this.mongoClient.connect(this.dbAddr())
-            .then(function (db) {
-                let dbase = db.db(this.dbName);
-                dbase.createCollection(this.collectionName)
-                    .then(function (dbCollection) {
-                        // console.log("Collection Switched!");
-                        //console.log(removeDuplicateHeaders(dbCollection, "url"));
-                        dbCollection.insertOne(dataObject, function (res, err) {
-                            if (this.collectionName === "access-sites") {
-                                // console.log("Collection Switched!");
-                                //console.log(removeDuplicateHeaders(dbCollection, "url"));
-                                dbCollection.insertOne(dataObject, function (res, err) {
-                                });
-                            }
-                            else if (this.collectionName === "user-history") {
-                                dbCollection.findOne(dataObject, (err, res) => {
-                                    if (err) {
-                                        console.log(err);
-                                    }
-                                    else if (res) {
-                                        // console.log("Find duplicates: ", res);
-                                    }
-                                    else {
-                                        dbCollection.insertOne(dataObject, (err, res) => {
-                                        });
-                                    }
-                                });
-                            }
-                            else if (this.collectionName === "testUserAgent") {
-                                //write the request into the db based on the user agnet
-                                // console.log(dataObject);
-                                dbCollection.insertOne(dataObject, (err, res) => {
-                                });
-                            }
-                        }).catch(function (err) {
-                            console.log(err);
-                        });
-                    }).catch(function (err) {
-                    console.log("Change DB went wrong: ", err);
-                });
-            });
-    }
-
-    saveNewCacheIntoDB(cacheData) {
-        this.mongoCient.connect(this.dbAddr())
-            .then(function(db) {
-                let dbase = db.db(this.dbName);
-                console.log("DB Connected");
-                dbase.createCollection(this.collectionName)
-                    .then(function (dbCollection) {
-                        dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
-                            // console.log(result);
-                            if(result === null) {
-                                dbCollection.insertOne(cacheData, (err, res) => {
-                                    console.log(err);
-                                });
-                            }
-                            else {
-                                console.log("Has been cached at ")
-                            }
-                        });
-                    });
-            });
-    }
-
-    loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, websocket) {
-        return new Promise(resolve => {
-            MongoClient.connect(dbUrl)
-                .then(function (db) {
-                    let dbase = db.db("YPTN-Client");
-                    dbase.createCollection(collectionName)
-                        .then(function(dbCollection) {
-                            // console.log(requestDetails.url);
-                            dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
-                                // console.log(result);
-                                if(result === null) {
-                                    websocket.emit("CacheExistenceCheck", "uncached");
-                                }
-                                else {
-                                    // websocket.emit("CacheExistenceCheck", "cached");
-                                    // websocket.emit("SendCache", result);
-                                    createCacheRequest(result, websocket)
-                                }
-                            });
-                        });
-                });
-        })
-    }
-
-}
-
-class webSocketAccess {
-    constructor(socketIO){
-        this.socketIO = socketIO;
-    }
-}
-
-class HTMLConverter {
-    constructor() {
-
-    }
-}
-
-class webPageEvaluate {
-    constructor(threshold) {
-        this.threshold = threshold;
-
-    }
-
-    updateRanking(dbase,accessArray,collectionName) {
-        dbase.createCollection(collectionName)
-            .then(function(dbCollection){
-                dbCollection.removeMany();
-                accessArray.forEach(element => {
-                    if(element["count"] >= this.threshold) {
-                        // console.log(element["_id"]["url"].length);
-                        // console.log(element["count"]);
-                        // console.log(element["_id"]["url"].hashCode());
-                        dbase.createCollection(collectionName)
-                            .then(function(dbCollection) {
-                                dbCollection.insertOne({
-                                    "url":element["_id"]["url"],
-                                    "access-count":element["count"],
-                                    "digest":element["_id"]["url"].hashCode()
-                                });
-                            });
-                    }
-                });
-            });
-    }
-
-    updateThreshold() {
-        // Update threshold for different types of site.
-    }
-
-    findAccessRanking(MongoClient, dbUrl, collectionName, threshold) {
-        // console.log("Start Finding Duplicates...");
-        MongoClient.connect(dbUrl)
-            .then(function(db) {
-                let dbase = db.db("YPTN-Client");
-                dbase.createCollection(collectionName)
-                    .then(function(dbCollection) {
-                        // console.log("Collection Switched!");
-                        dbCollection.aggregate([
-                            {
-                                $group: {
-                                    _id: {url: "$url"},
-                                    count: {$sum: 1}},
-                            }
-                        ]).toArray((err, res) => {
-                            // console.log(res);
-                            // DO something with the res
-                            updateRanking(dbase, res, "access-ranking", 5);
-                        });
-                    }).catch(function(err) {
-                    console.log(err);
-                });
-            }).catch(function(err) {
-            console.log("Change DB went wrong");
-        });
-    }
-
-    isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName, msg, websocket) {
-        MongoClient.connect(dbUrl)
-            .then(function(db) {
-                let dbase = db.db("YPTN-Client");
-                dbase.createCollection(collectionName)
-                    .then(function(dbCollection) {
-                        dbCollection.findOne({"url":msg["url"]}, (err, res) => {
-                            if(err) {console.log(err);}
-                            else {
-                                if(!res) {
-                                    console.log("Not frequently accessed");
-                                    websocket.emit("AccessFrequencyCheck", "false");
-                                }
-                                else {
-                                    // console.log("Find frequently accesses site: ", res);
-                                    websocket.emit("AccessFrequencyCheck", "true");
-                                }
-                            }
-                        });
-
-                    });
-            });
-    }
-
-
-
-
-
-
-
-
-}
-
-class nodeConnetcion {
-
-}
-
-
-
 // A NodeJS server
 let WebSocketServer = require('ws').Server;
 // wss = new WebSocketServer({port:8080});
@@ -244,6 +10,7 @@ const path = require("path"); // file path issue
 const nStatic = require("node-static");
 let fileServer = new nStatic.Server('./temp');
 let md5 = require("js-md5");
+let updateMiddleWare = require("./selfUpdate");
 
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
@@ -302,6 +69,17 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                     //write the request into the db based on the user agnet
                     // console.log(dataObject);
                     dbCollection.insertOne(dataObject, (err, res) => {});
+            }
+            //TODO Add one for URL-HASH map
+            else if(collectionName === "url-hash-map") {
+                dbCollection.find({"hashValue": dataObject["hashValue"]}).toArray((err, result)=>{
+                    if(err) throw(err);
+                    if(result.length === 0) {
+                        // Not stored before
+                        dbCollection.insertOne(dataObject, (err, res)=>{if(err) console.error(err)})
+                    }
+                })
+
             }
         }).catch(function(err) {
             console.log(err);
@@ -400,7 +178,7 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
             // console.log("DB Connected");
             dbase.createCollection(collectionName)
                 .then(function (dbCollection) {
-                    dbCollection.findOne({"digest":cacheData.digest}, (err, result) => {
+                    dbCollection.findOne({"url-digest":cacheData["url-digest"]}, (err, result) => {
                         // console.log(result);
                         if(result === null) {
                             dbCollection.insertOne(cacheData, (err, res) => {
@@ -424,20 +202,23 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                     .then(function(dbCollection) {
                         // console.log(requestDetails.url);
                         dbCollection.findOne({"url": requestDetails.url}, (err, result) => {
-                            // console.log(result);
+                            // console.log("INFO: Query result", result);
                             if(result === null) {
                                 websocket.emit("CacheExistenceCheck", "uncached");
                             }
                             else {
-                                // websocket.emit("CacheExistenceCheck", "cached");
+                                websocket.emit("CacheExistenceCheck", "cached");
                                 // websocket.emit("SendCache", result);
-                                createCacheRequest(result, websocket)
+                                // createCacheRequest(result, websocket);
+                                sendCacheURLBack(md5(requestDetails.url), websocket);
+
                             }
                         });
                     });
             });
     })
 }
+
 function hashToCreateUrl(url) {
     let sha256sum = crypto.createHash('sha256'); // Use sha256 to hash the url to create a url for client to redirect
 
@@ -453,7 +234,26 @@ function hashToCreateUrl(url) {
 
 }
 
-function createMHTMLLFile(cacheData, path, websocket) {
+function hasSearchResultinDB(MongoClient, dbUrl, dbName, collectionName, query)
+{
+    return new Promise((resolve, reject) => {
+        MongoClient.connect(dbUrl)
+            .then((db) => {
+                let dbase = db.db(dbName);
+                dbase.createCollection(collectionName)
+                    .then(dbCollection => {
+                        dbCollection.find(query).toArray((err, result)=>{
+                            if(err) reject(err);
+                            if(result.length === 0) resolve(false);
+                            else resolve(true);
+                        })
+                    })
+            })
+    });
+}
+
+function sendCacheURLBack(path, websocket) {
+    /*
     return new Promise((resolve, reject) => {
         // let html = new XMLSerializer().serializeToString(mhtml2html.convert(mhtml2html.parse(cacheData)).target);
         // let html = mhtml2html.convert(mhtml2html.parse(cacheData));
@@ -461,27 +261,31 @@ function createMHTMLLFile(cacheData, path, websocket) {
         fs.writeFile(path+'.mhtml',cacheData, (err) => {
             if(err) reject(err);
             console.log("Cache file created!");
-            cacheFilePath = "http://localhost:8080/"+path+".mhtml";
+            cacheFilePath = "https://localhost:3000/"+path;
             console.log("Cache file path is: ", cacheFilePath);
             sendCachePathToUser(cacheFilePath, websocket);
         })
     });
-}
+    */
 
-function sendCachePathToUser(cachePath, websocket)
-{
-    websocket.emit("CacheURL", cachePath);
-}
+    let cacheFilePath = "https://localhost:3000/" + path;
+    console.log("Cache URL: ", cacheFilePath);
+    websocket.emit("CacheURL", cacheFilePath);}
+
 function createCacheRequest(cacheDetails, websocket) {
     // process the cache data in the db for client to redirect
     // I haven't finished this part yet,
+
     hashToCreateUrl(cacheDetails.url)
         .then(fileName => {
-            createMHTMLLFile(cacheDetails.cache, fileName, websocket)
-                .then((error) => {
-                    if(error) throw(error);
-                    //Cache path = http://IP:port/filePath/fileName.mhtml
-                })
+            //TODO Save Hash value into DB for HTTP/2 Edge
+            //TODO Build a Hash map corresponding Hash value with URL
+
+            let hashURLObject = {
+                "hashValue": fileName,
+                "url": cacheDetails.url
+            };
+            writeDataintoDB(MongoClient, dbUrl, hashURLObject, "url-hash-map");
         })
 }
 
@@ -502,7 +306,7 @@ app.get("/", (req, res) => {
 
 
 app.get('/temp', (req, res) => {
-    // console.log("Receiving request:", req.ip + req.hostname)
+    // console.log("Rezceiving request:", req.ip + req.hostname)
     // res.send("Cache works!");
     // res.sendFile("index.html");
 });
@@ -528,7 +332,7 @@ io.on("connection", (ws) => {
         {
             writeDataintoDB(MongoClient, dbUrl, msg, collectionName = "access-sites");
             isFrequentlyAccessedSite(MongoClient, dbUrl, collectionName = "access-ranking", msg, ws);
-            loadCacheFromDB(MongoClient, dbUrl, collectionName = "mhtml-cache", msg, ws);
+            loadCacheFromDB(MongoClient, dbUrl, collectionName = "cache-info", msg, ws);
         }
     });
 
@@ -552,26 +356,53 @@ io.on("connection", (ws) => {
         catch (e) {
             console.log("A non-json file has been received")
         }
-        console.log("Start caching site");
+        console.log("Start caching site,", msg);
         let storedData = {
-            "digest": msg.digest,
-            "identity": msg.identity,
             "timeStamp": msg.timeStamp,
             "url": msg.url,
             "url-digest": md5(msg.url),
-            "initUpdateGap": 3600000
         // Remove cache in the saved object
         };
         // update.update(msg.url);
-        saveNewCacheIntoDB(MongoClient, dbUrl, collectionName = "cache-info", storedData);
+        console.log(storedData);
+        saveNewCacheIntoDB(MongoClient, dbUrl, "cache-info", storedData);
     });
+
+    ws.on("urlToBeCached", (msg) => {
+        console.log("urlToBeCached", msg);
+        // Find if the url has been cached before or not, if it has, then ignore
+        hasSearchResultinDB(MongoClient, dbUrl, "YPTN-Client", "cache-info", {"url": msg})
+            .then(flag => {
+                if(flag) {
+                    console.log("INFO: This site has been cached before, will not be cached again");
+                }
+                else{
+                    console.log("INFO: Will start caching the site");
+                    updateMiddleWare.update(msg);
+                }
+            });
+
+        // if(hasSearchResultinDB(
+        //     MongoClient,
+        //     dbUrl,
+        //     "YPTN-Client",
+        //     "cache-info",
+        //     {"url": msg}) === true)
+        // {
+        // }
+        // else {
+        //     console.log("INFO: Will start caching the site");
+        //     // updateMiddleWare.update(msg);
+        // }
+
+    })
 });
 
 // Run the self-update
-let selfUpdateTaskInit = setInterval(() => {
-    console.log("This is the original cache self update task, executed every 1 hour by default");
-    update.update("https://www.yahoo.co.jp");
-}, 60000);
+// let selfUpdateTaskInit = setInterval(() => {
+//     console.log("This is the original cache self update task, executed every 1 hour by default");
+//     update.update("https://www.yahoo.co.jp");
+// }, 60000);
 
 
     // ws.on('message', function(msg) {

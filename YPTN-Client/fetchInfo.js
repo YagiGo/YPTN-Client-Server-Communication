@@ -117,18 +117,27 @@ function sendNewCacheToEdge(websocket, requestDetails) {
                     try
                     {
                         // TODO: Instead of using MHTML, HTML will be used
-                        chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
-                            function (mhtmlData) {
-                                // console.log("Get site in mhtml form");
-                                // console.log(mhtmlData);
-                                // let temp = bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp);
-                                // console.log(temp);
-                                bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
-                                    .then((bsonifiedData) => {
-                                        console.log(bsonifiedData);
-                                        sendData("SiteCache", JSON.stringify(bsonifiedData), websocket);
-                                    })
-                            });
+                        // chrome.pageCapture.saveAsMHTML({"tabId" : requestDetails.tabId},
+                        //     function (mhtmlData) {
+                        //         // console.log("Get site in mhtml form");
+                        //         // console.log(mhtmlData);
+                        //         // let temp = bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp);
+                        //         // console.log(temp);
+                        //         bsonifyMHTMLCache(mhtmlData, requestDetails.url, requestDetails.timeStamp)
+                        //             .then((bsonifiedData) => {
+                        //                 console.log(bsonifiedData);
+                        //                 sendData("SiteCache", JSON.stringify(bsonifiedData), websocket);
+                        //             })
+                        //     });
+                        sendData("urlToBeCached", requestDetails.url, websocket);
+
+                        // TODO Following infos might be added in the future
+                        let msg = {
+                            "timeStamp": requestDetails.timeStamp,
+                            "url": requestDetails.url,
+                        };
+                        sendData("SiteCache", JSON.stringify(msg), websocket);
+                        // websocket.emit("urlToBeCached", requestDetails.url);
                     }
                     catch (e) {
                         console.log("Cache site went wrong: ", e);
@@ -162,31 +171,31 @@ function jsonifyRequestDetails(requestDetails) {
 		}
 }
 
-function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
-    // Conver the blob into string
-    reader = new FileReader();
-    /*
-    Calling the readAsText method won’t actually return the text.
-    Instead, it fires a an event called loadend after it finishes reading the content of the blob.
-    You have to handle this event in order to access the content of the blob as text.
-    That text is stored in e.srcElement.result, where e is the event object.
-     */
-    return new Promise(resolve => {
-        reader.readAsText(mhtmlData);
-        reader.addEventListener("loadend", (e) => {
-            let text = e.srcElement.result;
-            let result = {
-                "identity": "mhtmlData",
-                "url": url,
-                "digest": url.hashCode(),
-                "cache": text,
-                "timeStamp": timestamp
-            };
-            resolve(result);
-            // console.log(T"blob text as string", text);
-        });
-    })
-}
+// function bsonifyMHTMLCache(mhtmlData, url, timestamp) {
+//     // Conver the blob into string
+//     reader = new FileReader();
+//     /*
+//     Calling the readAsText method won’t actually return the text.
+//     Instead, it fires a an event called loadend after it finishes reading the content of the blob.
+//     You have to handle this event in order to access the content of the blob as text.
+//     That text is stored in e.srcElement.result, where e is the event object.
+//      */
+//     return new Promise(resolve => {
+//         reader.readAsText(mhtmlData);
+//         reader.addEventListener("loadend", (e) => {
+//             let text = e.srcElement.result;
+//             let result = {
+//                 "identity": "mhtmlData",
+//                 "url": url,
+//                 "digest": url.hashCode(),
+//                 "cache": text,
+//                 "timeStamp": timestamp
+//             };
+//             resolve(result);
+//             // console.log(T"blob text as string", text);
+//         });
+//     })
+// }
 
 function jsonifyRequestHeader(requestHeader) {
 	let result = {"identity": "requestHeaders"};
@@ -228,30 +237,27 @@ function pageChange(requestDetails, websocket=ws) {
 		console.log("New event: ", JSON.stringify(jsonifyRequestDetails(requestDetails)));
 		// isFrequentlyAccessedSites(websocket); // check if the site is among the frequently accessed sites
 		sendNewCacheToEdge(websocket, requestDetails);
+
         sendData("RequestDetails", JSON.stringify(jsonifyRequestDetails(requestDetails)), websocket);
+
         if(!requestDetails.url.startsWith("https://www.google.co.jp/complete/search"))
         {
             // Ignore the chrome auto complete request
-            //isSiteCached(websocket)
-            //    .then((flag) => {
-            //        console.log(requestDetails.url , flag);
-            //        if(flag === "cached") {
-            //            console.log("Found cache, will redirect", requestDetails.url);
-            //            requestCacheFromEdge(websocket);
-            //            redirectToCache(requestDetails.url);
-            //        }
-            //    });
-            // requestCacheFromEdge(websocket, (event) => {
-            //     if(event === "uncached") {}
-            //     else{
-            //         console.log("Cache sent from edge server received");
-            //     }
-            // });
-            console.log("%c Redirecting will start", 'background: #222; color: #bada55');
-            requestCacheFromEdge(websocket)
-                .then(cacheURL => {
-                    // redirectToCache(requestDetails.url, cacheURL);
+            isSiteCached(websocket)
+                .then((flag) => {
+                    // console.log(requestDetails.url , flag);
+                    if(flag === "cached") {
+                        // console.log("Found cache, will redirect", requestDetails.url);
+                        // requestCacheFromEdge(websocket);
+                        // redirectToCache(requestDetails.url);
+                        requestCacheFromEdge(websocket)
+                            .then(cacheURL => {
+                                // NOTICE: comment out the line in development environment
+                                // redirectToCache(requestDetails.url, cacheURL);
+                            });
+                    }
                 });
+            console.log("%c Redirecting will start", 'background: #222; color: #bada55');
         }
 	}
 
@@ -300,7 +306,7 @@ function redirectToCache(url, cacheURL)
     chrome.declarativeWebRequest.onRequest.addRules([{
     //First go to the DB to find match in the cache collection
     //Then find the match with the current url
-    //If there is one, redirect the request to the mhtml file
+    //If there is one, redirect the request to edge server with HTTP/2
     //If there is none, just send the request as it is
     //See UrlFilter https://developer.chrome.com/extensions/events#type-UrlFilter for url filtering guidance
      conditions: [new wr.RequestMatcher({url: {urlMatches: url}})],
@@ -326,18 +332,12 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 	["blocking", "requestHeaders"]
 );
 
-
-
 // Comment out for test purpose, REMEMBER TO UNCOMMENT!
 chrome.webRequest.onBeforeSendHeaders.addListener(
 	pageChange,
 	{urls: ["<all_urls>"], types: ["main_frame"]},
 	["blocking"]
 );
-
-
-
-
 
 // chrome.webRequest.onHeadersReceived.addListener(
 // 	pageChange,

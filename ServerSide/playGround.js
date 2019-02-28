@@ -232,15 +232,16 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
 writeDigestintoDB(MongoClient, dbUrl, "eshi_analysis", "eshi_info")
 */
 
-let MongoClient = require("mongodb").MongoClient;
-let dbUrl = "mongodb://192.168.96.208:27017";
+// let MongoClient = require("mongodb").MongoClient;
+// let dbUrl = "mongodb://192.168.96.208:27017";
+//
+// MongoClient.connect(dbUrl)
+//     .then(async db=>{
+//         let dbase = db.db("YPTN-Server");
+//         let collectionNames = await dbase.listCollections().toArray();
+//         for(let index in collectionNames) {
+//             console.log(collectionNames[index]["name"])
+//         }
+//     });
 
-MongoClient.connect(dbUrl)
-    .then(async db=>{
-        let dbase = db.db("YPTN-Server");
-        let collectionNames = await dbase.listCollections().toArray();
-        for(let index in collectionNames) {
-            console.log(collectionNames[index]["name"])
-        }
-    });
-
+console.log(__dirname)

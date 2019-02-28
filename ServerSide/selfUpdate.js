@@ -32,84 +32,90 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
             let dbase = db.db(dbName);
             dbase.createCollection(collectionName)
                 .then(collection => {
-                    collection.find({"_id": fileInfo["_id"]}).toArray(function(err, result) {
-                        if(result.length === 0) {
-                            collection.find({"URL": fileInfo["URL"]}).toArray(function(err, result) {
-                                if(err) throw err;
-                                if(result.length === 0) {
-                                    // 没有找到对应的MD5和URL的文件，表明此文件可能是新加的
-                                    collection.insertOne(fileInfo, (err) => {if(err) throw err;})
-                                }
-                                else{
-                                    for(let index in result) {
-                                        // MD5值变了但是URL不变，表示源文件发生了变化
-                                        let savedFileInfo = result[index];
+                    try
+                    {
+                        collection.find({"_id": fileInfo["_id"]}).toArray(function(err, result) {
+                            if(result.length === 0) {
+                                collection.find({"URL": fileInfo["URL"]}).toArray(function(err, result) {
+                                    if(err) throw err;
+                                    if(result.length === 0) {
+                                        // 没有找到对应的MD5和URL的文件，表明此文件可能是新加的
+                                        collection.insertOne(fileInfo, (err) => {if(err) throw err;})
+                                    }
+                                    else{
+                                        for(let index in result) {
+                                            // MD5值变了但是URL不变，表示源文件发生了变化
+                                            let savedFileInfo = result[index];
+                                            let updateValues = {
+                                                $set: {
+                                                    updateGap: savedFileInfo["updateGap"] < MIN_TOLERABLE_UPDATE_GAP?
+                                                        MIN_TOLERABLE_UPDATE_GAP : Math.round(savedFileInfo["updateGap"] / 2),
+                                                    unmodifiedTimes: 0,
+                                                    newlyAdded: 0,
+                                                    timeSinceLastUpdated: 0,
+                                                    savedPath: fileInfo["savedPath"]
+                                                }
+                                            };
+                                            collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) throw err;})
+                                        }
+                                    }
+                                });
+                            }
+                            else{
+                                // MD5值没变，源文件没有发生变化
+                                for(let index in result) {
+                                    let savedFileInfo = result[index];
+                                    // console.log(savedFileInfo["updateGap"], savedFileInfo["unmodifiedTimes"]);
+
+                                    if (savedFileInfo["updateGap"] < MAX_TOLERABLE_UPDATE_GAP && savedFileInfo["unmodifiedTimes"] < MAX_TOLERABLE_UNMODIFIED_TIMES) {
                                         let updateValues = {
                                             $set: {
-                                                updateGap: savedFileInfo["updateGap"] < MIN_TOLERABLE_UPDATE_GAP?
-                                                    MIN_TOLERABLE_UPDATE_GAP : Math.round(savedFileInfo["updateGap"] / 2),
-                                                unmodifiedTimes: 0,
+                                                URL: fileInfo["URL"],
+                                                updateGap: savedFileInfo["updateGap"],
+                                                unmodifiedTimes: savedFileInfo["unmodifiedTimes"] + 1,
                                                 newlyAdded: 0,
-                                                timeSinceLastUpdated: 0,
+                                                timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
                                                 savedPath: fileInfo["savedPath"]
                                             }
                                         };
-                                        collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) throw err;})
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
                                     }
-                                }
-                            });
-                        }
-                        else{
-                            // MD5值没变，源文件没有发生变化
-                            for(let index in result) {
-                                let savedFileInfo = result[index];
-                                // console.log(savedFileInfo["updateGap"], savedFileInfo["unmodifiedTimes"]);
 
-                                if (savedFileInfo["updateGap"] < MAX_TOLERABLE_UPDATE_GAP && savedFileInfo["unmodifiedTimes"] < MAX_TOLERABLE_UNMODIFIED_TIMES) {
-                                    let updateValues = {
-                                        $set: {
-                                            URL: fileInfo["URL"],
-                                            updateGap: savedFileInfo["updateGap"],
-                                            unmodifiedTimes: savedFileInfo["unmodifiedTimes"] + 1,
-                                            newlyAdded: 0,
-                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
-                                            savedPath: fileInfo["savedPath"]
-                                        }
-                                    };
-                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
-                                }
-
-                                else if (savedFileInfo["unmodifiedTimes"] >= MAX_TOLERABLE_UNMODIFIED_TIMES) {
-                                    let updateValues = {
-                                        $set: {
-                                            URL: fileInfo["URL"],
-                                            updateGap:  savedFileInfo["updateGap"] * 2,
-                                            unmodifiedTimes: 0,
-                                            newlyAdded: 0,
-                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
-                                            savedPath: fileInfo["savedPath"]
-                                        }
-                                    };
-                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
-                                }
-
-                                else if (savedFileInfo["updateGap"] >= MAX_TOLERABLE_UPDATE_GAP) {
-                                    let updateValues = {
-                                        $set: {
-                                            URL: fileInfo["URL"],
-                                            updateGap:  MAX_TOLERABLE_UPDATE_GAP,
-                                            unmodifiedTimes: 0,
-                                            newlyAdded: 0,
-                                            timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
-                                            savedPath: fileInfo["savedPath"]
-                                        }
+                                    else if (savedFileInfo["unmodifiedTimes"] >= MAX_TOLERABLE_UNMODIFIED_TIMES) {
+                                        let updateValues = {
+                                            $set: {
+                                                URL: fileInfo["URL"],
+                                                updateGap:  savedFileInfo["updateGap"] * 2,
+                                                unmodifiedTimes: 0,
+                                                newlyAdded: 0,
+                                                timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                                savedPath: fileInfo["savedPath"]
+                                            }
+                                        };
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
                                     }
-                                    collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
-                                }
 
+                                    else if (savedFileInfo["updateGap"] >= MAX_TOLERABLE_UPDATE_GAP) {
+                                        let updateValues = {
+                                            $set: {
+                                                URL: fileInfo["URL"],
+                                                updateGap:  MAX_TOLERABLE_UPDATE_GAP,
+                                                unmodifiedTimes: 0,
+                                                newlyAdded: 0,
+                                                timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
+                                                savedPath: fileInfo["savedPath"]
+                                            }
+                                        }
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                    }
+
+                                }
                             }
-                        }
-                    })
+                        })
+                    }
+                    catch(err) {
+                        console.error(err);
+                    }
                 })
                 .catch(err => {
                     if(err) {console.warn("Collection has been created, jumping to the collection")}
@@ -235,6 +241,7 @@ async function isCacheModified(urlToFetch, testDigestOutputPath) {
 
 async function update(urlToFetch, testDigestOutputPath) {
     /* 1 */
+
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
     const url = new URL(urlToFetch);
@@ -256,7 +263,7 @@ async function update(urlToFetch, testDigestOutputPath) {
     let fileDigest = {}; // Record digest of every file sent from web servers
     let fileNameDigest = {}; // Requested name changes and digest changes, FOR TEST PURPOSE
     let fileCounter = 0, modifiedCounter = 0, unmodifiedCounter = 0;
-
+    console.log("INFO:Starting puppeteer");
     /* 2 */
     // page.on('request', async (request) => {
     //     console.log(request.headers());
@@ -284,9 +291,10 @@ async function update(urlToFetch, testDigestOutputPath) {
                 "timeSinceLastUpdated": 0,
                 "savedPath": filePath
             };
+            // console.log(filePath);
             await fs.outputFile(filePath, await response.buffer());
             // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
-            writeDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
+            modifyDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
 
         }
         catch(err) {
@@ -366,7 +374,7 @@ async function updateFilePeriodically() {
                                                 console.log("DEBUG: Save new cache to path", fileInfo["savedPath"]);
                                                 await fs.outputFile(fileInfo["savedPath"], await response.buffer());
                                                 // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
-                                                // writeDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
+                                                // modifyDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
                                                 collection.updateOne({"_id": fileInfo["_id"]},
                                                     {
                                                         $set: {
@@ -441,7 +449,8 @@ function evaluate(startTimestamp, endTimestamp) {
 
 module.exports = {
     isCacheModified,
-    updateFilePeriodically
+    updateFilePeriodically,
+    update
 };
 
 
@@ -476,13 +485,13 @@ const testSiteSet2 = [
 ];
 
 // update check function test
-testSiteSet2.forEach(urlToFetch => {
-console.log("Start analyzing", urlToFetch);
-url = new URL(urlToFetch);
-const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
-console.log(updateFrequencyAnalysisPath);
-isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
-});
+// testSiteSet2.forEach(urlToFetch => {
+// console.log("Start analyzing", urlToFetch);
+// url = new URL(urlToFetch);
+// const updateFrequencyAnalysisPath = path.resolve(`./digest/${url.hostname}.json`);
+// console.log(updateFrequencyAnalysisPath);
+// isCacheModified(urlToFetch, updateFrequencyAnalysisPath);
+// });
 // updateFilePeriodically();
 
 // evaluate(startTimestamp=1547110800, endTimestamp=1547154000);
