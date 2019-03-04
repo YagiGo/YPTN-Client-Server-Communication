@@ -5,7 +5,7 @@ const DBMiddleware = require("./Middlewares/DbMiddleware.js"); // Database middl
 const path = require('path');
 // eslint-disable-next-line
 const http2 = require('http2');
-const helper = require('./pushFileHelper'); // help add header to file
+const helper = require('./Middlewares/pushFileHelper'); // help add header to file
 const { HTTP2_HEADER_PATH } = http2.constants;
 const PORT = 3000;
 const PUBLIC_PATH = path.join(__dirname, '../testSite');

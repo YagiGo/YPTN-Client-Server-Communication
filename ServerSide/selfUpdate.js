@@ -38,10 +38,10 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                         collection.find({"_id": fileInfo["_id"]}).toArray(function(err, result) {
                             if(result.length === 0) {
                                 collection.find({"URL": fileInfo["URL"]}).toArray(function(err, result) {
-                                    if(err) throw err;
+                                    if(err) console.error(err);
                                     if(result.length === 0) {
                                         // 没有找到对应的MD5和URL的文件，表明此文件可能是新加的
-                                        collection.insertOne(fileInfo, (err) => {if(err) throw err;})
+                                        collection.insertOne(fileInfo, (err) => {if(err) console.error(err);})
                                     }
                                     else{
                                         for(let index in result) {
@@ -57,7 +57,7 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                                                     savedPath: fileInfo["savedPath"]
                                                 }
                                             };
-                                            collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) throw err;})
+                                            collection.updateOne({"URL": fileInfo["URL"]}, updateValues, (err) => {if(err) console.error(err);})
                                         }
                                     }
                                 });
@@ -79,7 +79,7 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                                                 savedPath: fileInfo["savedPath"]
                                             }
                                         };
-                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) console.error(err);})
                                     }
 
                                     else if (savedFileInfo["unmodifiedTimes"] >= MAX_TOLERABLE_UNMODIFIED_TIMES) {
@@ -93,7 +93,7 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                                                 savedPath: fileInfo["savedPath"]
                                             }
                                         };
-                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) console.error(err);})
                                     }
 
                                     else if (savedFileInfo["updateGap"] >= MAX_TOLERABLE_UPDATE_GAP) {
@@ -107,7 +107,7 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                                                 savedPath: fileInfo["savedPath"]
                                             }
                                         }
-                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
+                                        collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) console.error(err);})
                                     }
 
                                 }
@@ -126,30 +126,42 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
 
 
 async function modifyDependency(filePath, tagNames) {
+    //TODO Add CSS modification here
     fs.readFile(filePath, "utf-8")
         .then((data) => {
             // if(err) console.error(err);
             let soup = new JSSoup(data);
             let srcDependency = {};
             for (let tagName in tagNames) {
-                let tags = soup.findAll(tagNames[tagName]);
-                tags.forEach(item => {
-                    if (item.attrs['src'] !== undefined) {
-                        // console.log(item.attrs['src']);
-                        try {
-                            let path = new URL(item.attrs['src']); // Need to be converted to local dependency
-                            srcDependency[item.attrs['src']] = path.pathname.substr(1);
-                            // item = path.hostname
-                        } catch (e) {
-                            // let path = item.attrs['src']; // Probably local dependency here.
-                            // console.log(path);
-                            // console.log(path);
-                            // No need to change the dependency
+                    let tags = soup.findAll(tagNames[tagName]);
+                    tags.forEach(item => {
+                        if (item.attrs['src'] !== undefined) {
+                            // console.log(item.attrs['src']);
+                            try {
+                                let path = new URL(item.attrs['src']); // Need to be converted to local dependency
+                                srcDependency[item.attrs['src']] = path.pathname.substr(1);
+                                // item = path.hostname
+                            } catch (e) {
+                                // console.error(e);
+                                // let path = item.attrs['src']; // Probably local dependency here.
+                                // console.log(path);
+                                // console.log(path);
+                                // No need to change the dependency
+                            }
                         }
-                    }
-                });
+                        else if (item.attrs["rel"] === "stylesheet") {
+                            // this is style sheet
+                            try {
+                                let path = new URL(item.attrs["href"]);
+                                srcDependency[item.attrs['href']] = path.pathname.substr(1);
+                            }
+                            catch(e) {
+                                // console.error(e);
+                            }
+                        }
+                    });
             }
-            //console.log(srcDependency);
+            console.log(srcDependency);
             return new Promise(resolve => {
                 resolve(srcDependency);
             })
@@ -502,4 +514,9 @@ const testSiteSet2 = [
 // testSiteSet.forEach(urlToFetch => {
 //     url = new URL(urlToFetch);
 //     updateFilePeriodically(urlToFetch)
+// });
+
+// modifyDependency("/Users/mac/YPTN-Client-Server-Communication/ServerSide/output/github.com/index.html", ["img", "script", "link"])
+// .then(srcDependency => {
+//     console.log(srcDependency);
 // });
