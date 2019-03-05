@@ -8,7 +8,7 @@ const http2 = require('http2');
 const helper = require('./Middlewares/pushFileHelper'); // help add header to file
 const { HTTP2_HEADER_PATH } = http2.constants;
 const PORT = 3000;
-const PUBLIC_PATH = path.join(__dirname, '../testSite');
+const PUBLIC_PATH = path.join(__dirname, 'output');
 
 const publicFiles = helper.getFiles(PUBLIC_PATH);
 const server = http2.createSecureServer({
@@ -21,6 +21,8 @@ const cacheInfo = "cache-info";
 const MongoClient = require("mongodb").MongoClient();
 const dbURL = config.DBUrl();
 
+
+console.log(PUBLIC_PATH)
 // Push file
 function push (stream, path) {
     const file = publicFiles.get(path);
@@ -63,6 +65,5 @@ server.listen(PORT, (err) => {
         console.error(err);
         return
     }
-
     console.log(`Server listening on ${PORT}`)
 });

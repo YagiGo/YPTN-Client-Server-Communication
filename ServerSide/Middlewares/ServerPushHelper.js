@@ -6,6 +6,8 @@ const JSSoup = require("jssoup").default;
 const config = require("./../config").config;
 const DBUrl = require("./../config").DBUrl();
 const DbMiddleware = require("./DbMiddleware");
+const MongoClient = require("mongodb").MongoClient;
+
 
 function isEmpty(obj) {
     for (let prop in obj) {
@@ -17,51 +19,76 @@ function isEmpty(obj) {
 async function parseHTML(rawHTML, tagNames) {
     // this function wraps html parser with async/await
     let soup = new JSSoup(rawHTML);
-    for(let tagName in tagNames) {
-
-    }
-    let elements = soup.findAll("link").concat(soup.findAll("script"));
     let fileList = []; // final output
-    // console.log(elements)
-    for(let index in elements) {
-        let attrs = elements[index].attrs;
-        if (!isEmpty(attrs)) {
-            if (attrs.hasOwnProperty("rel") && attrs["rel"] === "stylesheet")
-            {
-                fileList.push(attrs);
-            }
-            else if(!attrs.hasOwnProperty("rel")) {
-                fileList.push(attrs);
+    console.log(tagNames)
+    for(let index in tagNames) {
+        let elements = soup.findAll(tagNames[index]);
+        for(let index in elements) {
+            let attrs = elements[index].attrs;
+            if (!isEmpty(attrs)) {
+                if (attrs.hasOwnProperty("rel") && attrs["rel"] === "stylesheet")
+                {
+                    fileList.push(attrs);
+                }
+                else if(!attrs.hasOwnProperty("rel")) {
+                    fileList.push(attrs);
+                }
             }
         }
     }
     return fileList
 }
 
-async function saveServerPushFiles(requestedURL) {
+async function saveServerPushFiles(requestedURL, fileTypes) {
+    // File types:
+    // script : js
+    // link : stylesheet
+    // img : image
+    // set a list to store file types
 
     let baseDir = config["development"]["cachePath"];
     let parsedURL = new URL(requestedURL);
     let cachePath = path.join(baseDir, parsedURL.hostname, "index.html");
     // console.log(cacheDir)
     let htmlFile = await fs.readFile(cachePath, "utf-8");
-    let fileList = await parseHTML(htmlFile);
-    console.log(fileList)
+    let fileList = await parseHTML(htmlFile, fileTypes);
+    // console.log(fileList)
+    // Traverse JSON list to store File info
+    for(let index in fileList) {
+        let dataObject = {};
+
+        let fileInfo = fileList[index];
+        if(fileInfo.hasOwnProperty("href")) {
+            dataObject["filePath"] = fileInfo["href"];
+        }
+        if(fileInfo.hasOwnProperty("src")) {
+            dataObject["filePath"] = fileInfo["src"];
+            //console.log(fileInfo);
+        }
+        if(dataObject["filePath"] !== "") {
+            DbMiddleware.writeServerPushInfointoDB(MongoClient, DBUrl, dataObject,
+                config.development.DB.serverPushDB,
+                requestedURL);
+        }
+    }
 }
 
 async function saveFileDigest() {
 
+
 }
 
 async function getServerPushFiles(URL) {
-
+    return await DbMiddleware.readServerPushInfoFromDB(MongoClient, DBUrl,
+        config.development.DB.serverPushDB,
+        URL)
 }
 
 
 
-module.exports = {
-    saveServerPushFiles,
-    getServerPushFiles
+        module.exports = {
+            saveServerPushFiles,
+            getServerPushFiles
 };
 
-saveServerPushFiles("https://github.com")
+saveServerPushFiles("https://github.com", ["script", "link"]);

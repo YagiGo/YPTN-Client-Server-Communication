@@ -29,7 +29,6 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                                 // This one have been cached before
                                 if(collectionName == "cache-info") {
                                     // This stores cache site info, now need to see if the cache changed or not
-
                                 }
                             }
                             else {
@@ -42,7 +41,6 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
                         // console.log(dataObject);
                         dbCollection.insertOne(dataObject, (err, res) => {});
                     }
-                    //TODO Add one for URL-HASH map
                     else if(collectionName === "url-hash-map") {
                         dbCollection.find({"hashValue": dataObject["hashValue"]}).toArray((err, result)=>{
                             if(err) throw(err);
@@ -59,6 +57,33 @@ function writeDataintoDB(MongoClient, dbUrl, dataObject, collectionName) {
         }).catch(function(err) {
         console.log("Change DB went wrong: ", err);
     });
+}
+
+// TODO Merge the function below into the function above
+function writeServerPushInfointoDB(MongoClient, dbUrl, dataObject, dbName, dbCollection) {
+    MongoClient.connect(dbUrl)
+        .then(db => {
+            let dbase = db.db(dbName);
+            dbase.createCollection(dbCollection)
+                .then(dbCollection => {
+                    dbCollection.find({"filePath": dataObject["filePath"]}).toArray((err, result) =>{
+                        if(err) console.error(err);
+                        if(result.length === 0) {
+                            dbCollection.insertOne(dataObject, (err, res)=>{console.error(err);})
+                        }
+                    })
+                })
+        })
+}
+
+// TODO Merge the function below into the readDataFromDB function
+async function readServerPushInfoFromDB(MongoClient, dbUrl, dbName, dbCollection) {
+    let db = await MongoClient.connect(dbUrl);
+    let dbase = db.db(dbName);
+    let collection = await dbase.createCollection(dbCollection);
+    let res = await collection.find({}).toArray();
+    console.log(res)
+    return res;
 }
 
 function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
@@ -206,7 +231,7 @@ async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fi
                                                 timeSinceLastUpdated: savedFileInfo["timeSinceLastUpdated"] + savedFileInfo["updateGap"],
                                                 savedPath: fileInfo["savedPath"]
                                             }
-                                        }
+                                        };
                                         collection.updateOne({"_id": fileInfo["_id"]}, updateValues, (err)=>{if(err) throw err;})
                                     }
 
@@ -230,4 +255,6 @@ module.exports = {
     loadCacheFromDB,
     hasSearchResultinDB,
     modifyDigestintoDB,
+    writeServerPushInfointoDB,
+    readServerPushInfoFromDB
 }
