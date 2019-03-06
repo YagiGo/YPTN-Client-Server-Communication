@@ -91,4 +91,8 @@ async function getServerPushFiles(URL) {
             getServerPushFiles
 };
 
-saveServerPushFiles("https://github.com", ["script", "link"]);
+// saveServerPushFiles("https://github.com", ["script", "link"]);
+modules.exports = {
+    saveServerPushFiles,
+    getServerPushFiles
+}

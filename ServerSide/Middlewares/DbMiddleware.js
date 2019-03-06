@@ -76,13 +76,26 @@ function writeServerPushInfointoDB(MongoClient, dbUrl, dataObject, dbName, dbCol
         })
 }
 
+//TODO Merge the function below into the writeDataFromDB function
+async function writeURLHashIntoDB(MongoClient, dbUrl, dbName, dbCollection, dataObject) {
+    let db = await MongoClient.connect(dbUrl);
+    let dbase = db.db(dbName);
+    let collection = await dbase.createCollection(dbCollection);
+    collection.find({"hashValue": dataObject["hashValue"]}).toArray((err, result) => {
+        if(err) console.error(err);
+        if(result.length === 0) {
+            dbCollection.insertOne(dataObject, (err, res)=> {console.error(err);})
+        }
+    })
+}
+
 // TODO Merge the function below into the readDataFromDB function
 async function readServerPushInfoFromDB(MongoClient, dbUrl, dbName, dbCollection) {
     let db = await MongoClient.connect(dbUrl);
     let dbase = db.db(dbName);
     let collection = await dbase.createCollection(dbCollection);
     let res = await collection.find({}).toArray();
-    console.log(res)
+    console.log(res);
     return res;
 }
 
@@ -106,6 +119,13 @@ function saveNewCacheIntoDB(MongoClient, dbUrl, collectionName, cacheData) {
                     });
                 });
         });
+}
+
+async function getURLFromMD5(MongoClient, dbUrl, dbName, collectionName, hashValue) {
+    let db = await MongoClient.connect(dbUrl);
+    let dbase = db.db(dbName);
+    let collection = dbase.createCollection(collectionName);
+    let queryResult = await collection.findOne({"url-digest": hashValue});
 }
 
 function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, websocket) {
@@ -256,5 +276,6 @@ module.exports = {
     hasSearchResultinDB,
     modifyDigestintoDB,
     writeServerPushInfointoDB,
-    readServerPushInfoFromDB
+    readServerPushInfoFromDB,
+    getURLFromMD5
 }

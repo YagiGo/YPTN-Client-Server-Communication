@@ -33,6 +33,26 @@ async function getFiles (requestedURL, baseDir) {
             console.error("ERROR: Path error, will be ignored.");
         }
     });
+    let indexPath = path.join(baseDir, "index.html");
+    console.log(indexPath);
+    // Add HTML file info into the server push map.
+    try {
+        fileDescriptor = fs.openSync(indexPath, "r");
+        stat = fs.fstatSync(fileDescriptor);
+        contentType = mime.lookup(indexPath);
+        files.set(`/index.html`, {
+            fileDescriptor,
+            headers: {
+                'content-length': stat.size,
+                'last-modified': stat.mtime.toUTCString(),
+                'content-type': contentType
+            }
+        });
+    }
+    catch (e) {
+        console.error(e);
+        console.error("ERROR: No index file found.");
+    }
 
     // fs.readdirSync(baseDir).forEach((fileName) => {
     //     const filePath = path.join(baseDir, fileName);
@@ -58,4 +78,4 @@ module.exports = {
     getFiles
 };
 
-// getFiles("https://github.com", "/Users/mac/YPTN-Client-Server-Communication/ServerSide/output/github.com");
+// getFiles("https://github.com", "/Users/mac/YPTN-Client-Server-Communication/ServerSide/output/github.com")

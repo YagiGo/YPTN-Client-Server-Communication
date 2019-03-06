@@ -25,6 +25,7 @@ const MAX_TOLERABLE_UNMODIFIED_TIMES = 3; // Times the server allows before incr
 const MIN_TOLERABLE_UPDATE_GAP = 225000; // 最短更新间隔 225秒
 const MAX_TOLERABLE_UPDATE_GAP = 86400000; // 最长更新间隔 24小时
 let MongoClient = require("mongodb").MongoClient;
+const serverPushMiddleware = require("./Middlewares/ServerPushHelper");
 
 /*=================DB ACCESS======================*/
 async function modifyDigestintoDB(MongoClient, dbURL, dbName, collectionName, fileInfo) {
@@ -307,7 +308,7 @@ async function update(urlToFetch, testDigestOutputPath) {
             // console.log(filePath);
             await fs.outputFile(filePath, await response.buffer());
             // console.log(fileCounter, modifiedCounter, unmodifiedCounter);
-            modifyDigestintoDB(MongoClient, dbUrl, "YPTN-Server", url.hostname, fileInfo);
+            modifyDigestintoDB(MongoClient, dbUrl, "YPTN-Server", urlToFetch, fileInfo);
 
         }
         catch(err) {
@@ -324,6 +325,8 @@ async function update(urlToFetch, testDigestOutputPath) {
 
     // Modify dependency here
     await modifyDependency(indexPath, ["script", "img"]);
+    const pushFileType = ["link", "script"];
+    await serverPushMiddleware.saveServerPushFiles(urlToFetch, pushFileType);
     setTimeout(async () => {
         await browser.close();
     }, 2000 * 3);

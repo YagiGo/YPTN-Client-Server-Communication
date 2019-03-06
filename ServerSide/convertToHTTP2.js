@@ -10,7 +10,6 @@ const { HTTP2_HEADER_PATH } = http2.constants;
 const PORT = 3000;
 const PUBLIC_PATH = path.join(__dirname, 'output');
 
-const publicFiles = helper.getFiles(PUBLIC_PATH);
 const server = http2.createSecureServer({
     cert: fs.readFileSync(path.join(__dirname, '../testSSL/server.crt')),
     key: fs.readFileSync(path.join(__dirname, '../testSSL/server.key'))
@@ -18,11 +17,11 @@ const server = http2.createSecureServer({
 const serverSideDB = config.config["development"]["DB"]["serverSideDB"];
 const clientSideDB = config.config["development"]["DB"]["clientSideDB"];
 const cacheInfo = "cache-info";
-const MongoClient = require("mongodb").MongoClient();
+const MongoClient = require("mongodb").MongoClient;
 const dbURL = config.DBUrl();
 
+console.log(PUBLIC_PATH);
 
-console.log(PUBLIC_PATH)
 // Push file
 function push (stream, path) {
     const file = publicFiles.get(path);
@@ -38,8 +37,13 @@ function push (stream, path) {
 }
 
 // Request handler
-function onRequest (req, res) {
-    const reqPath = req.url === '/' ? '/index.html' : req.url;
+async function onRequest (req, res) {
+    // const reqPath = req.url === '/' ? '/index.html' : req.url;
+    const reqPath = '/index.html';
+    // get original URL from DB
+    let realUrl = await DBMiddleware.getURLFromMD5(MongoClient, dbURL, clientSideDB, "cache-info", req.url);
+    const publicFilePath = path.join(PUBLIC_PATH, realUrl["url"]);
+    const publicFiles = await helper.getFiles(req.url, publicFilePath);
     const file = publicFiles.get(reqPath);
     console.log(reqPath);
 
@@ -52,14 +56,19 @@ function onRequest (req, res) {
 
     // Push with index.html
     if (reqPath === '/index.html') {
-        push(res.stream, '/index.js');
-        push(res.stream, '/index.css');
+        // now push all the releated files
+        publicFiles.forEach((key, value) => {
+            if(key !== '/index.html') {
+               push(res.stream, value);
+            }
+        });
+        // push(res.stream, '/index.js');
+        // push(res.stream, '/index.css');
     }
 
     // Serve file
     res.stream.respondWithFD(file.fileDescriptor, file.headers)
 }
-
 server.listen(PORT, (err) => {
     if (err) {
         console.error(err);
@@ -67,3 +76,4 @@ server.listen(PORT, (err) => {
     }
     console.log(`Server listening on ${PORT}`)
 });
+

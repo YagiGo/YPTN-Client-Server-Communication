@@ -12,7 +12,7 @@ const nStatic = require("node-static");
 let fileServer = new nStatic.Server('./temp');
 let md5 = require("js-md5");
 let updateMiddleWare = require("./selfUpdate");
-
+const serverPushMiddleware = require("./Middlewares/ServerPushHelper");
 //I am supposed to use emit here, but to use emit in the
 //client side, the native websocket doesn't support the emit method.
 //The current solution is adding an identifier to the json file
@@ -24,6 +24,7 @@ let app = express();
 let http = require("http").Server(app);
 let io = require("socket.io")(http);
 let update = require("./selfUpdate");
+
 // let mhtml2html = require("mhtml2html");
 // let mhtml = require("mhtml");
 
@@ -214,6 +215,7 @@ function loadCacheFromDB(MongoClient, dbUrl, collectionName, requestDetails, web
                                 websocket.emit("CacheExistenceCheck", "cached");
                                 // websocket.emit("SendCache", result);
                                 // createCacheRequest(result, websocket);
+
                                 sendCacheURLBack(md5(requestDetails.url), websocket);
 
                             }
@@ -369,7 +371,11 @@ io.on("connection", (ws) => {
         };
         // update.update(msg.url);
         console.log(storedData);
-        saveNewCacheIntoDB(MongoClient, dbUrl, "cache-info", storedData);
+        let parsedUrl = new URL(msg.url);
+        if(parsedUrl.hostname !== "localhost") {
+            // Do not count access if it is localhost
+            saveNewCacheIntoDB(MongoClient, dbUrl, "cache-info", storedData);
+        }
     });
 
     ws.on("urlToBeCached", (msg) => {
@@ -383,6 +389,7 @@ io.on("connection", (ws) => {
                 else{
                     console.log("INFO: Will start caching the site");
                     updateMiddleWare.update(msg);
+
                 }
             });
 

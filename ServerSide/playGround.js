@@ -245,6 +245,11 @@ writeDigestintoDB(MongoClient, dbUrl, "eshi_analysis", "eshi_info")
 //     });
 
 // console.log(__dirname)
-const config = require("./config");
-console.log(config.DBUrl())
-console.log(config.config["development"]["DB"]["Addr"])
+// const config = require("./config");
+// console.log(config.DBUrl())
+// console.log(config.config["development"]["DB"]["Addr"])
+
+const {URL} = require("url");
+let url = "https://localhost:3000/23werw234fw";
+let parsedUrl = new URL(url);
+console.log(parsedUrl.hostname);
